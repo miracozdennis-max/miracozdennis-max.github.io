@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#122331">
+  <meta name="description" content="Diş protez laboratuvarı için iş ve teslimat takibi.">
+  <title>Protez Lab — İş Takibi</title>
+  <meta name="protez-api-origin" content="https://protez-is-takibi-7k4m.formalibex256.chatgpt.site">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar" id="sidebar" aria-label="Ana menü">
+      <a class="brand" href="#panom">
+        <span class="brand-mark" data-icon="tooth"></span>
+        <span><strong>Protez Lab</strong><small>Laboratuvar yönetimi</small></span>
+      </a>
+      <div class="nav-caption">ÇALIŞMA ALANI</div>
+      <nav class="side-nav">
+        <a href="#panom" data-page="panom"><span data-icon="grid"></span>Genel bakış</a>
+        <a href="#isler" data-page="isler"><span data-icon="clipboard"></span>İş takibi</a>
+        <a href="#takvim" data-page="takvim"><span data-icon="calendar"></span>Teslimat takvimi</a>
+        <a href="#arsiv" data-page="arsiv"><span data-icon="archive"></span>Tamamlanan işler</a>
+      </nav>
+      <div class="side-bottom">
+        <button class="demo-link" type="button" id="demo-toggle"><span data-icon="flask"></span><span id="demo-label">Örnek kayıtları incele</span></button>
+        <div class="workspace">
+          <span class="workspace-mark" data-icon="layers"></span>
+          <span><strong>Laboratuvar</strong><small id="workspace-mode">Ortak iş kayıtları</small></span>
+        </div>
+      </div>
+    </aside>
+    <button id="nav-overlay" class="nav-overlay" type="button" aria-label="Menüyü kapat" hidden></button>
+    <div class="main-shell">
+      <header class="topbar">
+        <div class="top-left">
+          <button id="menu-toggle" class="icon-button mobile-menu" type="button" aria-label="Menüyü aç" aria-expanded="false" aria-controls="sidebar"><span data-icon="menu"></span></button>
+          <span class="top-crumb">Çalışma alanı</span><span class="crumb-divider" data-icon="chevron"></span><span id="breadcrumb">Genel bakış</span>
+        </div>
+        <div class="top-right">
+          <span class="connection" id="connection"><i></i><span>Bağlanıyor</span></span>
+          <span class="user-avatar" title="Protez Lab" aria-label="Protez Lab">PL</span>
+        </div>
+      </header>
+      <main id="main">
+        <div id="demo-banner" class="demo-banner" hidden><span data-icon="flask"></span><div><strong>Örnek kayıtlar</strong><span>Bu görünümdeki değişiklikler geçicidir.</span></div><button type="button" id="exit-demo">Canlı kayıtlara dön</button></div>
+        <section class="hero">
+          <div>
+            <div class="date-line"><span data-icon="calendar"></span><time id="today"></time></div>
+            <h1 id="page-title">Laboratuvar panosu</h1>
+            <p id="page-subtitle">İş kabulden teslimata, tüm protez işlerinizi takip edin.</p>
+          </div>
+          <button class="primary new-button" type="button" data-new><span data-icon="plus"></span>Yeni iş kaydı</button>
+        </section>
+        <div id="load-error" class="load-error" hidden><div id="load-error-text"></div><button type="button" class="secondary" id="retry">Tekrar dene</button></div>
+        <section id="metrics" class="metrics" aria-label="İş durumu özeti"></section>
+        <div class="content-grid" id="content-grid">
+          <section class="panel job-panel" id="job-panel" aria-labelledby="jobs-title">
+            <div class="panel-head">
+              <div><h2 id="jobs-title">İş kayıtları</h2><p id="jobs-subtitle">Laboratuvarınızdaki işlerin güncel durumu</p></div>
+              <div class="panel-actions">
+                <button class="secondary export" type="button" id="export"><span data-icon="download"></span><span>CSV indir</span></button>
+                <button class="secondary export" type="button" id="backup" title="Tüm işlerin ve aşama geçmişinin yedeğini indir"><span data-icon="archive"></span><span>Yedek al</span></button>
+              </div>
+            </div>
+            <div class="filters">
+              <label class="search"><span data-icon="search"></span><input id="search" type="search" placeholder="İş no, klinik veya referans ara" aria-label="İş kayıtlarında ara"></label>
+              <label class="select-filter"><span data-icon="filter"></span><select id="status-filter" aria-label="Aşamaya göre filtrele"><option value="">Tüm aşamalar</option></select></label>
+            </div>
+            <div class="table-scroll">
+              <table>
+                <thead><tr><th scope="col">İş no / Referans</th><th scope="col">İş türü / Klinik</th><th scope="col">Teslim</th><th scope="col">Aşama</th><th scope="col"><span class="sr-only">İş ayrıntısı</span></th></tr></thead>
+                <tbody id="jobs"></tbody>
+              </table>
+              <div class="table-empty" id="table-empty" hidden></div>
+            </div>
+            <div class="table-footer"><span id="result-count" aria-live="polite"></span><button id="more-jobs" type="button" class="text-button" hidden>Daha fazla göster <span data-icon="chevron"></span></button></div>
+          </section>
+          <aside class="panel deadlines" id="deadlines" aria-labelledby="deadlines-title">
+            <div class="panel-head"><div><h2 id="deadlines-title">Yaklaşan teslimler</h2><p>Sıradaki işler</p></div><span class="panel-icon" data-icon="calendar"></span></div>
+            <div class="deadline-list" id="deadline-list"></div>
+            <a class="deadlines-link" href="#takvim">Teslimat takvimini aç <span data-icon="arrow"></span></a>
+          </aside>
+          <section class="panel calendar-panel" id="calendar-panel" aria-labelledby="calendar-title" hidden>
+            <div class="panel-head">
+              <div><h2 id="calendar-title">Teslimat takvimi</h2><p>Günlük teslim ve prova planı</p></div>
+              <div class="calendar-controls">
+                <button type="button" class="icon-button previous" id="previous-month" aria-label="Önceki ay"><span data-icon="chevron"></span></button>
+                <button type="button" class="secondary" id="current-month">Bugün</button>
+                <button type="button" class="icon-button" id="next-month" aria-label="Sonraki ay"><span data-icon="chevron"></span></button>
+              </div>
+            </div>
+            <h3 class="month-title" id="month-title"></h3>
+            <div id="calendar-grid" class="calendar-grid"></div>
+            <div class="calendar-agenda"><h3 id="agenda-title"></h3><div id="agenda-list"></div></div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>
+  <dialog class="job-dialog" id="job-dialog" aria-labelledby="dialog-title">
+    <form id="job-form">
+      <div class="dialog-head"><div><div class="dialog-kicker" id="dialog-kicker">İŞ KABUL</div><h2 id="dialog-title">Yeni iş kaydı</h2></div><button class="icon-button" type="button" data-close aria-label="Kapat"><span data-icon="x"></span></button></div>
+      <div class="dialog-body">
+        <div class="form-grid">
+          <label>Klinik / Hekim<input name="clinic" maxlength="100" placeholder="Örn. Merkez Diş Kliniği"></label>
+          <label>İş referansı<input name="patientCode" maxlength="60" placeholder="Örn. LAB-1042" aria-describedby="reference-help"><small id="reference-help">Laboratuvarın kendi iş kodunu yazabilirsiniz.</small></label>
+          <label>İş türü<select name="type" id="type-select"></select></label>
+          <label id="custom-type-label" hidden>İş türünü yazın<input name="customType" maxlength="80" placeholder="Örn. Gece plağı"></label>
+          <label>Giriş tarihi<input type="date" name="received"></label>
+          <label>Teslim tarihi<input type="date" name="due"></label>
+          <label>Prova tarihi<input type="date" name="trial"></label>
+          <label>Aşama<select name="status" id="form-status"></select></label>
+          <label>Sorumlu teknisyen<input name="owner" maxlength="80" placeholder="Ad veya baş harfler"></label>
+          <label>Diş numarası / Bölge<input name="teeth" maxlength="80" placeholder="Örn. 11–13 veya üst çene"></label>
+          <label>Üye / Adet<input name="units" type="number" min="1" step="1" inputmode="numeric" placeholder="Örn. 3"></label>
+          <label>Renk<input name="shade" maxlength="30" placeholder="Örn. A2"></label>
+        </div>
+        <label class="checkbox"><input type="checkbox" name="temporary">Geçici protez gerekiyor</label>
+        <section class="temporary-flow" id="temporary-flow" aria-labelledby="temporary-flow-title" hidden>
+          <div class="temporary-flow-head">
+            <h3 id="temporary-flow-title">Geçici iş akışı</h3>
+            <span id="temporary-phase" class="badge" role="status"></span>
+          </div>
+          <div class="temporary-flow-actions">
+            <button type="button" class="secondary" id="temporary-next"></button>
+            <button type="button" class="secondary" id="temporary-revise" hidden>Düzeltme istendi</button>
+          </div>
+        </section>
+        <label class="notes">Hekim notları<textarea name="doctorNotes" rows="3" maxlength="1000" placeholder="Örn. Yükseklik fazla, tam oturmuyor veya prova uygun."></textarea></label>
+        <label class="notes">Üretim notları<textarea name="notes" rows="3" maxlength="1000" placeholder="Örn. A2 disk, kazıma sonrası kontrol"></textarea></label>
+        <div class="record-meta" id="record-meta" hidden></div>
+        <p class="form-error" id="form-error" role="alert" hidden></p>
+      </div>
+      <div class="dialog-footer"><button type="button" class="secondary" data-close>Vazgeç</button><button type="submit" class="primary" id="save-job"><span data-icon="check"></span><span>İşi kaydet</span></button></div>
+    </form>
+  </dialog>
+  <div class="toast" id="toast" role="status" hidden></div>
+</body>
+</html>
