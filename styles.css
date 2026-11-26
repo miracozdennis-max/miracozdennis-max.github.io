@@ -67,10 +67,11 @@ h1 { font-size: clamp(27px,3.4vw,42px); line-height: 1.08; font-weight: 750; let
 .primary svg, .secondary svg, .icon-button svg { width: 17px; height: 17px; }
 .new-button { min-height: 45px; padding: 0 15px; flex: none; }
 .new-button svg { width: 18px; height: 18px; }
-.metrics { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 11px; margin-bottom: 24px; }
+.metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 11px; margin-bottom: 24px; }
+.metrics > a.metric { grid-column: span 2; }
 .metric { min-width: 0; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; text-align: left; align-items: start; padding: 15px; border-radius: 14px; border: 1px solid var(--border); background: var(--paper); color: var(--ink); box-shadow: var(--shadow); }
 .metric:hover:not(:disabled), .metric[aria-pressed="true"] { border-color: #86c4b9; background: #fbfefd; }
-.metric-label { display: block; color: #516672; font-weight: 670; font-size: 12px; line-height: 1.35; }
+.metric-label { display: block; color: #516672; font-weight: 670; font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; }
 .metric-number { display: block; margin-top: 6px; font-size: 29px; line-height: 1.1; font-weight: 730; letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
 .metric-note { grid-column: 1 / -1; font-size: 11px; color: var(--muted); line-height: 1.3; }
 .metric-icon, .panel-icon, .empty-icon { width: 35px; height: 35px; border-radius: 9px; }
@@ -146,6 +147,7 @@ td { border-top: 1px solid #eaf0f2; vertical-align: middle; font-size: 12px; }
 .deadline-copy { min-width: 0; flex: 1; }
 .deadline .cell-main { font-size: 12px; }
 .deadline .cell-sub { font-size: 10px; }
+.deadline-kind { display: inline-block; margin-inline-end: 5px; padding: 2px 5px; border-radius: 5px; font-size: 10px; font-weight: 680; }
 .deadline [data-icon="chevron"] { margin-left: auto; color: #708490; }
 .deadline [data-icon="chevron"] svg { width: 14px; height: 14px; }
 .small-empty { padding: 16px 0; border-top: 1px solid #edf1f3; color: var(--muted); font-size: 12px; line-height: 1.45; }
@@ -154,17 +156,23 @@ td { border-top: 1px solid #eaf0f2; vertical-align: middle; font-size: 12px; }
 .deadlines-link svg { width: 15px; height: 15px; }
 .calendar-controls { display: flex; gap: 6px; }
 .previous svg { transform: rotate(180deg); }
-.month-title { margin: 0 17px 13px; font-size: 17px; text-transform: capitalize; }
+.month-title { margin: 0 17px 8px; font-size: 17px; text-transform: capitalize; }
+.calendar-legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 17px 11px; padding: 0; list-style: none; }
+.calendar-legend li { padding: 4px 8px; border-radius: 7px; font-size: 11px; font-weight: 680; }
+.calendar-final { --schedule-bg: #e2f2ee; --schedule-ink: #145c50; }
+.calendar-temporary { --schedule-bg: #eee6fa; --schedule-ink: #5d4184; }
+.calendar-trial { --schedule-bg: #fbefdd; --schedule-ink: #855019; }
+.day-count, .deadline-kind, .calendar-legend li { background: var(--schedule-bg, #edf2f5); color: var(--schedule-ink, var(--ink)); }
 .calendar-grid { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); margin: 0 17px; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; background: var(--border); gap: 1px; }
 .weekday { background: #f0f5f6; padding: 8px 0; font-size: 11px; font-weight: 670; color: var(--muted); text-align: center; }
 .calendar-day, .calendar-blank { min-height: 62px; background: #fff; color: var(--ink); }
-.calendar-day { position: relative; border: 0; padding: 7px 6px; font-size: 13px; text-align: start; align-content: start; }
+.calendar-day { display: flex; flex-direction: column; align-items: flex-start; border: 0; padding: 7px 6px; font-size: 13px; text-align: start; }
 .calendar-day:focus-visible { outline-offset: -3px; }
 .calendar-day:hover, .calendar-day[aria-pressed="true"] { background: #e9f7f3; }
 .calendar-day[aria-current="date"] .day-num { background: var(--teal); color: #fff; }
 .day-num { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; font-weight: 600; }
-.day-count { display: block; width: fit-content; max-width: 100%; background: #e2f2ee; color: #145c50; border-radius: 8px; margin: 3px 0 0 2px; padding: 3px 6px; font-size: 10px; font-weight: 680; overflow-wrap: anywhere; }
-.day-count.trial-count { background: #fbefdd; color: #855019; }
+.day-count { display: block; width: fit-content; max-width: 100%; border-radius: 8px; margin-top: 3px; padding: 3px 6px; font-size: 10px; font-weight: 680; overflow-wrap: anywhere; }
+.day-count-abbr { display: none; }
 .calendar-agenda { padding: 16px 17px 11px; }
 .calendar-agenda h3 { font-size: 15px; margin-bottom: 9px; }
 .agenda-list .cell-sub { font-size: 11px; }
@@ -198,12 +206,10 @@ td { border-top: 1px solid #eaf0f2; vertical-align: middle; font-size: 12px; }
 .temporary-flow-actions { margin-top: 8px; }
 .temporary-flow-actions button { white-space: normal; text-align: left; }
 .temporary-flow-actions #temporary-next { color: var(--teal); }
-.job-extra { padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; background: #f8fafc; }
-.job-extra summary { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 45px; color: var(--teal); cursor: pointer; font-size: 13px; font-weight: 720; list-style: none; }
-.job-extra summary::-webkit-details-marker { display: none; }
-.job-extra summary::after { content: ""; width: 8px; height: 8px; flex: none; margin-right: 3px; border-right: 2px solid; border-bottom: 2px solid; transform: rotate(45deg) translate(-2px,-2px); }
-.job-extra[open] { padding-bottom: 12px; }
-.job-extra[open] summary::after { transform: rotate(225deg) translate(-2px,-2px); }
+.job-extra { padding: 13px 12px; border: 1px solid var(--border); border-radius: 10px; background: #f8fafc; }
+.job-extra h3 { margin-bottom: 10px; color: var(--teal); font-size: 14px; font-weight: 720; }
+.job-extra .job-dates { grid-template-columns: repeat(2,minmax(0,1fr)); margin-bottom: 13px; }
+.job-dates > label { display: flex; flex-direction: column; justify-content: space-between; }
 .job-extra .notes { margin-top: 12px; }
 .dialog-footer { border-top: 1px solid var(--border); flex-wrap: wrap; justify-content: end; }
 .delete-job { margin-inline-end: auto; border-color: #e8c8c2; color: #922d25; }
@@ -221,15 +227,20 @@ td { border-top: 1px solid #eaf0f2; vertical-align: middle; font-size: 12px; }
 .record-meta li { margin-bottom: 4px; }
 .form-error { padding: 9px; margin-top: 10px; background: #fff1ee; border-radius: 7px; color: #972d22; font-size: 12px; }
 .toast { position: fixed; right: max(16px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); z-index: 5; max-width: calc(100% - 32px); box-shadow: 0 5px 15px #14312f33; padding: 12px 16px; border-radius: 9px; background: #193c3b; color: #fff; font-size: 13px; }
+@media (min-width: 1440px) {
+  .metrics { grid-template-columns: repeat(7,minmax(0,1fr)); }
+  .metrics > a.metric { grid-column: auto; }
+}
 @media (max-width: 1210px) {
   .shell { grid-template-columns: 202px minmax(0,1fr); }
   .sidebar { padding-inline: 12px; }
   main, .topbar { padding-inline: 23px; }
   .content-grid { grid-template-columns: minmax(0,1fr) 224px; gap: 13px; }
   .metric { padding-inline: 11px; }
-  .metrics { grid-template-columns: repeat(3,minmax(0,1fr)); }
 }
 @media (max-width: 990px) {
+  .metrics { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .metrics > a.metric { grid-column: 1 / -1; }
   .content-grid { grid-template-columns: minmax(0,1fr); }
   .deadlines { max-width: 100%; }
   .deadline-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); column-gap: 16px; }
@@ -284,7 +295,8 @@ td { border-top: 1px solid #eaf0f2; vertical-align: middle; font-size: 12px; }
   .job-row td:nth-child(3), .job-row td:nth-child(4) { margin-top: 6px; align-self: center; }
   .job-row td:nth-child(5) { grid-column: 3; grid-row: 1 / 3; align-self: center; }
   .open-job { width: 44px; height: 44px; background: #f1f7f7; }
-  .date-cell::before { content: "Teslim "; color: var(--muted); font-size: 10px; margin-right: 2px; font-weight: 500; }
+  .date-cell { white-space: normal; }
+  .date-cell[data-label]::before { content: attr(data-label); display: block; margin-bottom: 2px; color: var(--muted); font-size: 10px; font-weight: 500; }
   .deadline-list { display: block; }
   .guide-grid { grid-template-columns: minmax(0,1fr); }
   .job-dialog { inset: auto 0 0; margin: 0; width: 100%; max-width: 100%; max-height: calc(100vh - 14px); max-height: calc(100dvh - max(14px, env(safe-area-inset-top))); border-width: 1px 0 0; border-radius: 17px 17px 0 0; }
@@ -293,11 +305,16 @@ td { border-top: 1px solid #eaf0f2; vertical-align: middle; font-size: 12px; }
   .dialog-footer { padding-bottom: max(11px, env(safe-area-inset-bottom)); }
   .dialog-body { padding: 12px 13px; }
   .form-grid { gap: 9px; }
-  .month-title, .calendar-grid { margin-inline: 10px; }
-  .calendar-day { min-height: 52px; padding: 3px; }
+  .month-title, .calendar-legend, .calendar-grid { margin-inline: 10px; }
+  .calendar-day, .calendar-blank { min-height: 52px; }
+  .calendar-day { padding: 3px; }
   .calendar-controls .icon-button { width: 36px; min-height: 40px; }
   .calendar-controls .secondary { padding-inline: 6px; }
-  .day-count { padding: 2px 3px; margin-left: 0; }
+}
+@media (max-width: 520px) {
+  .day-count { padding: 2px 4px; }
+  .day-count-label { display: none; }
+  .day-count-abbr { display: inline; }
 }
 @media (max-width: 375px) {
   .form-grid { grid-template-columns: minmax(0,1fr); }

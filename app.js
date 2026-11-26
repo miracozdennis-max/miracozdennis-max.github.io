@@ -20,6 +20,7 @@ const statuses = {
 };
 const temporaryStages = new Set(["gecici", "gecici_basildi", "gecici_prova", "gecici_goruldu", "gecici_duzeltme", "hekim_onay"]);
 const temporaryTypes = new Set(["Diş üstü geçici", "İmplant üstü geçici"]);
+const temporaryPendingStages = new Set(["kabul", "tasarim", "gecici", "gecici_basildi", "gecici_prova", "gecici_goruldu", "gecici_duzeltme"]);
 const temporaryNext = {
   kabul: ["gecici", "Geçici aşamasına al"],
   tasarim: ["gecici", "Geçici aşamasına al"],
@@ -38,9 +39,15 @@ const types = [
 const pages = {
   panom: ["Genel bakış", "Laboratuvar panosu", "İş kabulden teslimata, tüm protez işlerinizi takip edin."],
   isler: ["İş takibi", "İş takibi", "Aktif kayıtları arayın, düzenleyin ve üretim aşamalarını güncelleyin."],
-  takvim: ["Teslimat takvimi", "Teslimat takvimi", "Teslim ve prova tarihlerini gün gün görün."],
+  geciprova: ["Geçici provalar", "Geçici provalar", "Geçici prova teslim tarihlerini ve hekim onayı bekleyen işleri takip edin."],
+  takvim: ["Teslimat takvimi", "Teslimat takvimi", "Bitim ve prova tarihlerini gün gün görün."],
   arsiv: ["Tamamlanan işler", "Tamamlanan işler", "Teslim edilen protez işlerine ve ayrıntılarına ulaşın."],
   kilavuz: ["Nasıl kullanılır", "Nasıl kullanılır?", "İş kaydından teslimata kadar Orilab'ı kullanmayı öğrenin."]
+};
+const scheduleKinds = {
+  final: { label: "Bitim", dayLabel: "Bitim", abbr: "B" },
+  temporary: { label: "Geçici prova", dayLabel: "Geçici", abbr: "G" },
+  trial: { label: "Prova", dayLabel: "Prova", abbr: "P" }
 };
 const icons = {
   tooth: '<path d="M12 5.8c-1.4-.3-2.2-1.7-4.6-1.5C3.5 4.7 3 8.6 4.6 12c1.1 2.5 1.1 6.4 3.1 6.8 1.8.4 1.6-5.1 4.3-5.1s2.5 5.5 4.3 5.1c2-.4 2-4.3 3.1-6.8C21 8.6 20.5 4.7 16.6 4.3c-2.4-.2-3.2 1.2-4.6 1.5Z"/><path d="M10.2 5.3c1.7 1.2 3 1.7 4.3 1.3"/>',
@@ -76,11 +83,16 @@ const todayString = () => {
 const shortDate = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short", timeZone: "UTC" });
 const longDate = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "long", year: "numeric", weekday: "long", timeZone: "UTC" });
 const monthFormat = new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric", timeZone: "UTC" });
+const shortMonth = new Intl.DateTimeFormat("tr-TR", { month: "short", timeZone: "UTC" });
 const timeFormat = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Istanbul" });
 const asDate = (date) => new Date(date + "T12:00:00Z");
 const displayDate = (date) => date ? shortDate.format(asDate(date)) : "—";
 const dateOnly = (date) => date.toISOString().slice(0, 10);
 const openStatus = (job) => job.status !== "teslim";
+const hasTemporary = (job) => job.temporary || temporaryStages.has(job.status) || temporaryTypes.has(job.type);
+const pendingTemporary = (job) => hasTemporary(job) && temporaryPendingStages.has(job.status);
+const trialIsLate = (job) =>
+  job.trial && job.trial < today && pendingTemporary(job) && job.status !== "gecici_prova" && job.status !== "gecici_goruldu";
 const typeName = (job) => job.type || "İş türü girilmedi";
 const jobDescription = (job) => {
   const description = (job.patientCode || "").trim();
@@ -113,6 +125,7 @@ const form = $("#job-form");
 const dialog = $("#job-dialog");
 const controls = form.elements;
 const sortActive = (a, b) => (a.due || "9999").localeCompare(b.due || "9999") || b.id - a.id;
+const sortTemporary = (a, b) => (a.trial || "9999").localeCompare(b.trial || "9999") || sortActive(a, b);
 
 async function api(path, options = {}) {
   const response = await fetch(new URL(path, apiOrigin), {
@@ -174,13 +187,18 @@ function renderMetrics() {
     ["tasarim", "Tasarımda", active.filter((job) => job.status === "tasarim").length, "Tasarım aşamasında", "design", "rose"],
     ["kazima", "Kazımada", active.filter((job) => job.status === "kazima").length, "Kazıma aşamasında", "mill", "cyan"],
     ["uretim", "Üretimde", active.filter((job) => job.status === "uretim").length, "Üretim aşamasındaki işler", "tool", "blue"],
-    ["today", "Bugün teslim", todayJobs.length, overdue.length ? overdue.length + " geciken iş de var" : "Bugüne planlanan teslimler", "clock", "amber"],
-    ["hazir", "Teslime hazır", active.filter((job) => job.status === "hazir").length, "Teslim için bekleyen işler", "circled", "purple"]
+    ["today", "Bugün bitim", todayJobs.length, overdue.length ? overdue.length + " geciken iş de var" : "Bugüne planlanan bitimler", "clock", "amber"],
+    ["hazir", "Teslime hazır", active.filter((job) => job.status === "hazir").length, "Teslim için bekleyen işler", "circled", "purple"],
+    ["geciprova", "Geçici provalar", active.filter(pendingTemporary).length, "Planlama ve hekim onayı", "calendar", "rose"]
   ];
   const oldFocus = document.activeElement?.dataset.metric;
-  $("#metrics").innerHTML = tiles.map(([key, label, count, hint, glyph, color]) =>
-    '<button class="metric" type="button" data-metric="' + key + '" aria-pressed="' + (metricFilter === key) + '"' + (!ready ? " disabled" : "") + '><span><span class="metric-label">' + label + '</span><strong class="metric-number">' + (ready ? count : "—") + '</strong></span>' + icon(glyph, "metric-icon " + color) + '<span class="metric-note">' + hint + "</span></button>"
-  ).join("");
+  $("#metrics").innerHTML = tiles.map(([key, label, count, hint, glyph, color]) => {
+    const content = '<span><span class="metric-label">' + label + '</span><strong class="metric-number">' +
+      (ready ? count : "—") + '</strong></span>' + icon(glyph, "metric-icon " + color) + '<span class="metric-note">' + hint + "</span>";
+    if (key === "geciprova") return '<a class="metric" href="#geciprova">' + content + "</a>";
+    return '<button class="metric" type="button" data-metric="' + key + '" aria-pressed="' + (metricFilter === key) + '"' +
+      (!ready ? " disabled" : "") + ">" + content + "</button>";
+  }).join("");
   if (oldFocus) $("#metrics").querySelector('[data-metric="' + oldFocus + '"]')?.focus({ preventScroll: true });
 }
 
@@ -188,38 +206,55 @@ function filteredJobs() {
   const query = $("#search").value.trim().toLocaleLowerCase("tr-TR");
   const stage = $("#status-filter").value;
   const archive = selectedPage === "arsiv";
+  const temporaryView = selectedPage === "geciprova";
   let list = jobs.filter(archive ? (job) => !openStatus(job) : openStatus);
+  if (temporaryView) list = list.filter(pendingTemporary);
   if (metricFilter === "today") list = list.filter((job) => job.due === today);
-  if (stage === "temporary") list = list.filter((job) => job.temporary || temporaryStages.has(job.status));
+  if (stage === "temporary") list = list.filter(hasTemporary);
   else if (stage) list = list.filter((job) => job.status === stage);
   if (query) {
     list = list.filter((job) => [jobDescription(job), job.clinic, job.type, job.owner, job.assistant].some(
       (value) => (value || "").toLocaleLowerCase("tr-TR").includes(query)
     ));
   }
-  return list.sort(archive ? (a, b) => b.updatedAt.localeCompare(a.updatedAt) : sortActive);
+  if (archive) return list.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return list.sort(temporaryView ? sortTemporary : sortActive);
 }
 
 function renderJobs() {
   const list = filteredJobs();
   const visible = list.slice(0, pageLimit);
+  const temporaryView = selectedPage === "geciprova";
+  const dateLabel = temporaryView ? "Geçici prova" : "Bitim";
   const focusedJob = $("#jobs").contains(document.activeElement) ? document.activeElement.dataset.job : null;
-  $("#jobs").innerHTML = visible.map((job) =>
-    '<tr class="job-row"><td><span class="cell-main case">' + escapeHtml(jobTitle(job)) +
-    '</span></td><td><span class="cell-main">' + escapeHtml(typeName(job)) + '</span>' +
-    (job.clinic ? '<span class="cell-sub">' + escapeHtml(job.clinic) + '</span>' : '') +
-    (job.owner ? '<span class="cell-sub">Teknisyen · ' + escapeHtml(job.owner) + '</span>' : '') +
-    (job.assistant ? '<span class="cell-sub">Asistan · ' + escapeHtml(job.assistant) + '</span>' : '') +
-    '</td><td><span class="cell-main date-cell' + (openStatus(job) && job.due && job.due < today ? " date-late" : "") + '">' + displayDate(job.due) +
-    '</span></td><td><span class="badge status-' + job.status + '">' + statuses[job.status] +
-    '</span></td><td><button class="open-job" type="button" data-job="' + job.id + '" aria-label="' + escapeHtml(jobTitle(job)) + ' ayrıntısını aç">' + icon("chevron") + '</button></td></tr>'
-  ).join("");
+  $("#jobs").innerHTML = visible.map((job) => {
+    const date = temporaryView ? job.trial : job.due;
+    const late = temporaryView ? trialIsLate(job) : openStatus(job) && job.due && job.due < today;
+    let otherDate = "";
+    if (temporaryView && job.due) otherDate = "Bitim · " + displayDate(job.due);
+    if (!temporaryView && openStatus(job) && hasTemporary(job) && job.trial) {
+      otherDate = "Geçici prova · " + displayDate(job.trial);
+    }
+    return '<tr class="job-row"><td><span class="cell-main case">' + escapeHtml(jobTitle(job)) +
+      '</span></td><td><span class="cell-main">' + escapeHtml(typeName(job)) + '</span>' +
+      (job.clinic ? '<span class="cell-sub">' + escapeHtml(job.clinic) + '</span>' : '') +
+      (job.owner ? '<span class="cell-sub">Teknisyen · ' + escapeHtml(job.owner) + '</span>' : '') +
+      (job.assistant ? '<span class="cell-sub">Asistan · ' + escapeHtml(job.assistant) + '</span>' : '') +
+      '</td><td><span class="cell-main date-cell' + (late ? " date-late" : "") + '" data-label="' + dateLabel + '">' +
+      (temporaryView && !date ? "Planlanmadı" : displayDate(date)) + '</span>' +
+      (otherDate ? '<span class="cell-sub">' + otherDate + '</span>' : '') +
+      '</td><td><span class="badge status-' + job.status + '">' + statuses[job.status] +
+      '</span></td><td><button class="open-job" type="button" data-job="' + job.id + '" aria-label="' + escapeHtml(jobTitle(job)) +
+      ' ayrıntısını aç">' + icon("chevron") + '</button></td></tr>';
+  }).join("");
   const empty = $("#table-empty");
   empty.hidden = !!list.length;
   if (!list.length) {
     const hasFilter = !!($("#search").value || $("#status-filter").value || metricFilter);
-    const title = !ready ? (loadFailure ? "Kayıtlar yüklenemedi" : "Kayıtlar yükleniyor") : hasFilter ? "Eşleşen iş bulunamadı" : selectedPage === "arsiv" ? "Henüz teslim edilen iş yok" : "Henüz kayıt yok";
-    const hint = hasFilter ? "Aramayı veya aşama filtresini değiştirin." : selectedPage === "arsiv" ? "Teslim edildi aşamasındaki işler burada görünür." : "Laboratuvara gelen ilk işi kaydedin.";
+    const title = !ready ? (loadFailure ? "Kayıtlar yüklenemedi" : "Kayıtlar yükleniyor") : hasFilter ? "Eşleşen iş bulunamadı" :
+      selectedPage === "arsiv" ? "Henüz teslim edilen iş yok" : temporaryView ? "Bekleyen geçici prova yok" : "Henüz kayıt yok";
+    const hint = hasFilter ? "Aramayı veya aşama filtresini değiştirin." : selectedPage === "arsiv" ? "Teslim edildi aşamasındaki işler burada görünür." :
+      temporaryView ? "Geçici olarak işaretlenen ve onay bekleyen işler burada görünür." : "Laboratuvara gelen ilk işi kaydedin.";
     empty.innerHTML = icon("clipboard", "empty-icon mint") + "<strong>" + title + "</strong>" +
       (ready ? "<p>" + hint + "</p>" : "") +
       (ready && !loadFailure && !hasFilter && selectedPage !== "arsiv" ? '<button type="button" class="secondary" data-new>' + icon("plus") + " Yeni iş kaydı</button>" : "");
@@ -230,20 +265,37 @@ function renderJobs() {
   if (focusedJob) $("#jobs").querySelector('[data-job="' + focusedJob + '"]')?.focus({ preventScroll: true });
 }
 
-function deadlineButton(job, date, detail) {
+function jobSchedule(job) {
+  return [
+    { job, date: job.due, kind: "final" },
+    { job, date: job.trial, kind: hasTemporary(job) ? "temporary" : "trial" }
+  ].filter((entry) => entry.date);
+}
+
+function deadlineButton({ job, date, kind }, indicator = "") {
   const day = asDate(date);
-  const month = new Intl.DateTimeFormat("tr-TR", { month: "short", timeZone: "UTC" }).format(day);
   const title = jobTitle(job);
-  const description = [detail, job.type !== title ? job.type : ""].filter(Boolean).join(" · ");
-  return '<button type="button" class="deadline" data-job="' + job.id + '"><span class="date-tile"><strong>' + day.getUTCDate() +
-    "</strong><small>" + month + '</small></span><span class="deadline-copy"><span class="cell-main">' + escapeHtml(title) +
-    '</span><span class="cell-sub">' + escapeHtml(description) + "</span></span>" + icon("chevron") + "</button>";
+  const description = [indicator, job.clinic, job.type !== title ? job.type : ""].filter(Boolean).join(" · ");
+  return '<button type="button" class="deadline" data-job="' + job.id + '" data-schedule-kind="' + kind +
+    '"><span class="date-tile"><strong>' + day.getUTCDate() + "</strong><small>" + shortMonth.format(day) +
+    '</small></span><span class="deadline-copy"><span class="cell-main">' + escapeHtml(title) +
+    '</span><span class="deadline-kind calendar-' + kind + '">' + scheduleKinds[kind].label + "</span>" +
+    (description ? '<span class="cell-sub">' + escapeHtml(description) + "</span>" : "") +
+    "</span>" + icon("chevron") + "</button>";
 }
 
 function renderDeadlines() {
-  const upcoming = jobs.filter((job) => openStatus(job) && job.due >= today).sort(sortActive).slice(0, 5);
-  $("#deadline-list").innerHTML = upcoming.length ? upcoming.map((job) => deadlineButton(job, job.due, job.due === today ? "Bugün" : job.clinic)).join("") :
-    '<p class="small-empty">Yaklaşan teslim tarihi olan açık iş yok.</p>';
+  const scheduled = jobs.filter(openStatus).flatMap(jobSchedule).filter(
+    (entry) => entry.kind === "final" || (entry.kind === "temporary" && pendingTemporary(entry.job))
+  );
+  const upcoming = scheduled.filter((entry) => entry.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date) || b.job.id - a.job.id).slice(0, 5);
+  const late = scheduled.filter((entry) => entry.kind === "temporary" && trialIsLate(entry.job))
+    .sort((a, b) => b.date.localeCompare(a.date) || b.job.id - a.job.id)[0];
+  if (late) upcoming.push(late);
+  $("#deadline-list").innerHTML = upcoming.length ? upcoming.map(
+    (entry) => deadlineButton(entry, entry.date === today ? "Bugün" : entry.date < today ? "Gecikti" : "")
+  ).join("") : '<p class="small-empty">Yaklaşan bitim veya geçici prova teslimi yok.</p>';
 }
 
 function renderCalendar() {
@@ -255,11 +307,10 @@ function renderCalendar() {
   const monthDays = new Map();
   for (const job of jobs) {
     if (!openStatus(job)) continue;
-    for (const [key, label] of [["due", "Teslim"], ["trial", "Prova"]]) {
-      const date = job[key];
-      if (!date?.startsWith(calendarMonth)) continue;
-      if (!monthDays.has(date)) monthDays.set(date, []);
-      monthDays.get(date).push({ job, label });
+    for (const entry of jobSchedule(job)) {
+      if (!entry.date.startsWith(calendarMonth)) continue;
+      if (!monthDays.has(entry.date)) monthDays.set(entry.date, []);
+      monthDays.get(entry.date).push(entry);
     }
   }
   $("#month-title").textContent = monthFormat.format(first);
@@ -269,12 +320,19 @@ function renderCalendar() {
   for (let day = 1; day <= length; day++) {
     const date = calendarMonth + "-" + String(day).padStart(2, "0");
     const entries = monthDays.get(date) || [];
-    const deliveries = entries.filter((entry) => entry.label === "Teslim").length;
-    const trials = entries.length - deliveries;
+    const labels = [];
+    const counts = [];
+    for (const [kind, { label, dayLabel, abbr }] of Object.entries(scheduleKinds)) {
+      const count = entries.filter((entry) => entry.kind === kind).length;
+      if (!count) continue;
+      labels.push(count + " " + label.toLocaleLowerCase("tr-TR"));
+      counts.push('<span class="day-count calendar-' + kind + '" aria-hidden="true">' + count +
+        ' <span class="day-count-label">' + dayLabel + '</span><span class="day-count-abbr">' + abbr + '</span></span>');
+    }
+    const description = labels.length ? labels.join(", ") : "Planlanmış iş yok";
     days.push('<button type="button" class="calendar-day" data-day="' + date + '" aria-pressed="' + (date === agendaDay) +
-      '"' + (date === today ? ' aria-current="date"' : "") + ' aria-label="' + longDate.format(asDate(date)) + ", " + deliveries + " teslim, " + trials + ' prova"><span class="day-num">' + day +
-      "</span>" + (deliveries ? '<span class="day-count">' + deliveries + " teslim</span>" : "") +
-      (trials ? '<span class="day-count trial-count">' + trials + " prova</span>" : "") + "</button>");
+      '"' + (date === today ? ' aria-current="date"' : "") + ' aria-label="' + longDate.format(asDate(date)) + ", " +
+      description + '"><span class="day-num">' + day + "</span>" + counts.join("") + "</button>");
   }
   while (days.length % 7) days.push(blank);
   const focusedDay = document.activeElement?.dataset.day;
@@ -282,8 +340,8 @@ function renderCalendar() {
   if (focusedDay) $("#calendar-grid").querySelector('[data-day="' + focusedDay + '"]')?.focus({ preventScroll: true });
   $("#agenda-title").textContent = longDate.format(asDate(agendaDay));
   const entries = monthDays.get(agendaDay) || [];
-  $("#agenda-list").innerHTML = entries.length ? entries.map(({ job, label }) => deadlineButton(job, agendaDay, [label, job.clinic].filter(Boolean).join(" · "))).join("") :
-    '<p class="small-empty">Bu gün için planlanmış teslim veya prova yok.</p>';
+  $("#agenda-list").innerHTML = entries.length ? entries.map((entry) => deadlineButton(entry)).join("") :
+    '<p class="small-empty">Bu gün için planlanmış bitim veya prova yok.</p>';
 }
 
 function render() {
@@ -316,10 +374,17 @@ function updatePage() {
   $("#breadcrumb").textContent = breadcrumb;
   $("#page-title").textContent = title;
   $("#page-subtitle").textContent = subtitle;
-  $("#jobs-title").textContent = selectedPage === "arsiv" ? "Teslim edilen işler" : "İş kayıtları";
-  $("#jobs-subtitle").textContent = selectedPage === "arsiv" ? "Aşaması teslim edildi olan kayıtlar" : "Laboratuvarınızdaki işlerin güncel durumu";
-  $("#status-filter").hidden = selectedPage === "arsiv";
-  $("#status-filter").parentElement.hidden = selectedPage === "arsiv";
+  const archive = selectedPage === "arsiv";
+  const temporaryView = selectedPage === "geciprova";
+  $("#jobs-title").textContent = archive ? "Teslim edilen işler" : temporaryView ? "Bekleyen geçici provalar" : "İş kayıtları";
+  $("#jobs-subtitle").textContent = archive ? "Aşaması teslim edildi olan kayıtlar" :
+    temporaryView ? "Prova teslim tarihine göre sıralanır" : "Laboratuvarınızdaki işlerin güncel durumu";
+  $("#job-date-heading").textContent = temporaryView ? "Geçici prova teslimi" : "Bitim";
+  const statusFilter = $("#status-filter");
+  const options = temporaryView ? temporaryStatusOptions : '<option value="temporary">Geçici içeren işler</option>' + activeStatusOptions;
+  statusFilter.innerHTML = '<option value="">Tüm aşamalar</option>' + options;
+  statusFilter.hidden = archive;
+  statusFilter.parentElement.hidden = archive;
   for (const link of document.querySelectorAll("[data-page]")) {
     if (link.dataset.page === selectedPage) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
@@ -363,7 +428,8 @@ function setCustomType() {
 function renderTemporaryWorkflow() {
   const stage = controls.status.value;
   const action = temporaryNext[stage];
-  const temporary = controls.temporary.checked || temporaryStages.has(stage) || temporaryTypes.has(controls.type.value);
+  const temporary = hasTemporary({ temporary: controls.temporary.checked, status: stage, type: controls.type.value });
+  $("#trial-date-label").textContent = temporary ? "Geçici prova teslim tarihi" : "Prova tarihi";
   $("#temporary-flow").hidden = !temporary || !action;
   if (!temporary || !action) return;
   const phase = $("#temporary-phase");
@@ -461,7 +527,6 @@ async function openJob(id, source) {
   syncJobActions();
   submissionKey = job ? "" : crypto.randomUUID();
   form.reset();
-  $("#job-extra-details").open = false;
   showFormError("");
   const title = $("#dialog-title");
   title.textContent = job ? jobTitle(job) : "Yeni iş kaydı";
@@ -520,7 +585,7 @@ async function saveJob(event) {
   if (!data.patientCode && existing && !jobDescription(existing)) {
     data.patientCode = existing.patientCode;
   }
-  data.temporary = controls.temporary.checked;
+  data.temporary = hasTemporary({ temporary: controls.temporary.checked, status: data.status, type: data.type });
   data.units = data.units ? Number(data.units) : null;
   data.version = editVersion;
   if (editId === null) data.submissionKey = submissionKey;
@@ -615,8 +680,12 @@ function downloadFile(blob, filename) {
 }
 
 function exportCsv() {
-  const columns = ["İş tanımı", "Klinik / Hekim", "İş türü", "Giriş", "Teslim", "Prova", "Aşama", "Teknisyen", "Asistan", "Diş / Bölge", "Adet", "Renk", "Geçici", "Üretim notları", "Hekim notları"];
-  const cells = (job) => [jobDescription(job), job.clinic, job.type, job.received, job.due, job.trial, statuses[job.status], job.owner, job.assistant, job.teeth, job.units, job.shade, job.temporary ? "Evet" : "Hayır", job.notes, job.doctorNotes];
+  const columns = ["İş tanımı", "Klinik / Hekim", "İş türü", "Giriş", "Bitim tarihi", "Geçici prova teslim tarihi", "Prova tarihi", "Aşama", "Teknisyen", "Asistan", "Diş / Bölge", "Adet", "Renk", "Geçici", "Üretim notları", "Hekim notları"];
+  const cells = (job) => {
+    const temporary = hasTemporary(job);
+    return [jobDescription(job), job.clinic, job.type, job.received, job.due, temporary ? job.trial : "", temporary ? "" : job.trial,
+      statuses[job.status], job.owner, job.assistant, job.teeth, job.units, job.shade, temporary ? "Evet" : "Hayır", job.notes, job.doctorNotes];
+  };
   const quote = (value) => {
     let cell = String(value ?? "");
     if (/^[\s\uFEFF]*[=+\-@]|^[\t\r\n]/.test(cell)) cell = "'" + cell;
@@ -644,7 +713,7 @@ for (const node of document.querySelectorAll("[data-icon]")) node.innerHTML = sv
 const renderStatusOption = ([key, label]) => '<option value="' + key + '">' + label + "</option>";
 const statusEntries = Object.entries(statuses);
 const activeStatusOptions = statusEntries.filter(([key]) => key !== "teslim").map(renderStatusOption).join("");
-$("#status-filter").insertAdjacentHTML("beforeend", '<option value="temporary">Geçici içeren işler</option>' + activeStatusOptions);
+const temporaryStatusOptions = statusEntries.filter(([key]) => temporaryPendingStages.has(key)).map(renderStatusOption).join("");
 $("#form-status").innerHTML = statusEntries.map(renderStatusOption).join("");
 $("#type-select").innerHTML = '<option value="">Seçilmedi</option>' + types.map((type) =>
   "<option>" + type + "</option>").join("") + '<option value="__custom">Diğer</option>';
@@ -670,14 +739,9 @@ $("#temporary-next").addEventListener("click", (event) => {
 $("#temporary-revise").addEventListener("click", () => {
   if (mutationPending || deleteDeadline !== null) return;
   selectJobStage("gecici_duzeltme");
-  $("#job-extra-details").open = true;
   controls.doctorNotes.focus();
 });
 form.addEventListener("submit", saveJob);
-form.addEventListener("invalid", (event) => {
-  const details = event.target.closest("details");
-  if (details) details.open = true;
-}, true);
 $("#delete-job").addEventListener("click", startDeleteConfirmation);
 $("#delete-cancel").addEventListener("click", cancelDeleteConfirmation);
 $("#delete-confirm").addEventListener("click", deleteJob);
@@ -695,8 +759,11 @@ dialog.addEventListener("close", () => {
   deleteDeadline = null;
   syncJobActions();
   const sourceJob = dialogSource?.dataset.job;
+  const sourceKind = dialogSource?.dataset.scheduleKind;
+  const sourceList = dialogSource?.closest("#jobs, #deadline-list, #agenda-list");
   render();
-  const source = dialogSource?.isConnected ? dialogSource : sourceJob && document.querySelector('[data-job="' + sourceJob + '"]');
+  const sourceSelector = '[data-job="' + sourceJob + '"]' + (sourceKind ? '[data-schedule-kind="' + sourceKind + '"]' : "");
+  const source = dialogSource?.isConnected ? dialogSource : sourceJob && sourceList?.querySelector(sourceSelector);
   dialogSource = null;
   (source || $(".new-button")).focus();
 });

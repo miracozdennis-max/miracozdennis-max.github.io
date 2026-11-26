@@ -8,8 +8,8 @@
   <title>Orilab — İş Takibi</title>
   <meta name="protez-api-origin" content="https://protez-is-takibi-7k4m.formalibex256.chatgpt.site">
   <link rel="icon" href="./icon.svg?v=orilab" type="image/svg+xml">
-  <link rel="stylesheet" href="./styles.css?v=orilab-11">
-  <script src="./app.js?v=orilab-11" defer></script>
+  <link rel="stylesheet" href="./styles.css?v=orilab-12">
+  <script src="./app.js?v=orilab-12" defer></script>
 </head>
 <body>
   <div class="shell">
@@ -21,6 +21,7 @@
       <nav class="side-nav" aria-label="Çalışma alanı">
         <a href="#panom" data-page="panom"><span data-icon="grid"></span>Genel bakış</a>
         <a href="#isler" data-page="isler"><span data-icon="clipboard"></span>İş takibi</a>
+        <a href="#geciprova" data-page="geciprova"><span data-icon="clock"></span>Geçici provalar</a>
         <a href="#takvim" data-page="takvim"><span data-icon="calendar"></span>Teslimat takvimi</a>
         <a href="#arsiv" data-page="arsiv"><span data-icon="archive"></span>Tamamlanan işler</a>
         <a class="guide-link" href="#kilavuz" data-page="kilavuz"><span data-icon="help"></span>Nasıl kullanılır?</a>
@@ -64,7 +65,7 @@
             </div>
             <div class="table-scroll">
               <table>
-                <thead><tr><th scope="col" id="record-heading">İş</th><th scope="col">İş türü ve ekip</th><th scope="col">Teslim</th><th scope="col">Aşama</th><th scope="col"><span class="sr-only">İş ayrıntısı</span></th></tr></thead>
+                <thead><tr><th scope="col" id="record-heading">İş</th><th scope="col">İş türü ve ekip</th><th scope="col" id="job-date-heading">Bitim</th><th scope="col">Aşama</th><th scope="col"><span class="sr-only">İş ayrıntısı</span></th></tr></thead>
                 <tbody id="jobs"></tbody>
               </table>
               <div class="table-empty" id="table-empty" hidden></div>
@@ -72,13 +73,13 @@
             <div class="table-footer"><span id="result-count" aria-live="polite"></span><button id="more-jobs" type="button" class="text-button" hidden>Daha fazla göster <span data-icon="chevron"></span></button></div>
           </section>
           <aside class="panel deadlines" id="deadlines" aria-labelledby="deadlines-title">
-            <div class="panel-head"><div><h2 id="deadlines-title">Yaklaşan teslimler</h2><p>Sıradaki işler</p></div><span class="panel-icon" data-icon="calendar"></span></div>
+            <div class="panel-head"><div><h2 id="deadlines-title">Yaklaşan teslimler</h2><p>Bitim ve geçici prova tarihleri</p></div><span class="panel-icon" data-icon="calendar"></span></div>
             <div class="deadline-list" id="deadline-list"></div>
             <a class="deadlines-link" href="#takvim">Teslimat takvimini aç <span data-icon="arrow"></span></a>
           </aside>
           <section class="panel calendar-panel" id="calendar-panel" aria-labelledby="calendar-title" hidden>
             <div class="panel-head">
-              <div><h2 id="calendar-title">Teslimat takvimi</h2><p>Günlük teslim ve prova planı</p></div>
+              <div><h2 id="calendar-title">Teslimat takvimi</h2><p>Günlük bitim ve prova planı</p></div>
               <div class="calendar-controls">
                 <button type="button" class="icon-button previous" id="previous-month" aria-label="Önceki ay"><span data-icon="chevron"></span></button>
                 <button type="button" class="secondary" id="current-month">Bugün</button>
@@ -86,6 +87,11 @@
               </div>
             </div>
             <h3 class="month-title" id="month-title"></h3>
+            <ul class="calendar-legend" aria-label="Takvim işaretleri" role="list">
+              <li class="calendar-final">Bitim</li>
+              <li class="calendar-temporary">Geçici</li>
+              <li class="calendar-trial">Prova</li>
+            </ul>
             <div id="calendar-grid" class="calendar-grid"></div>
             <div class="calendar-agenda"><h3 id="agenda-title"></h3><div id="agenda-list"></div></div>
           </section>
@@ -95,8 +101,8 @@
             <div class="guide-heading"><span class="panel-icon" data-icon="plus"></span><h2>Yeni iş kaydı açın</h2></div>
             <ol>
               <li>Panoda <strong>Yeni iş kaydı</strong> düğmesine basın. İş tanımını yazın ve uygun iş türünü seçin. Listede yoksa <strong>Diğer</strong> seçeneğini kullanın.</li>
-              <li>Varsa klinik veya hekim bilgisini, teslim tarihini ve sorumlu teknisyeni ekleyin. İşe destek olan kişi kendi adını <strong>Asistan</strong> alanına yazabilir.</li>
-              <li>Prova tarihi, diş numarası, adet ve renk gibi bilgileri <strong>Diğer iş ayrıntıları</strong> bölümünde doldurabilirsiniz. Bildiğiniz bilgileri girip <strong>İşi kaydet</strong> düğmesine basın.</li>
+              <li>Varsa klinik veya hekim bilgisini ve sorumlu teknisyeni ekleyin. İşe destek olan kişi kendi adını <strong>Asistan</strong> alanına yazabilir.</li>
+              <li>Aynı formun altındaki <strong>Diğer iş ayrıntıları</strong> bölümünde bitim ve prova tarihlerini yan yana girebilirsiniz. Diş numarası, adet ve renk de bu bölümde yer alır. Bildiğiniz bilgileri girip <strong>İşi kaydet</strong> düğmesine basın.</li>
             </ol>
           </article>
           <article class="panel guide-card">
@@ -108,11 +114,13 @@
           <article class="panel guide-card">
             <div class="guide-heading"><span class="panel-icon" data-icon="tooth"></span><h2>Geçici iş ve provayı izleyin</h2></div>
             <p><strong>Geçici protez gerekiyor</strong> kutusunu işaretleyin. Geçici iş akışında sırasıyla <strong>Geçici basıldı</strong>, <strong>Geçici provaya gönderildi</strong> ve <strong>Geçici prova görüldü</strong> adımlarını kullanın. Her değişiklikten sonra kaydı kaydedin.</p>
+            <p>Plan belliyse <strong>Geçici prova teslim tarihi</strong> alanını doldurun. Sol menüdeki <strong>Geçici provalar</strong> bölümünden bu işleri ve aşamalarını takip edebilirsiniz.</p>
             <p>Prova görüldüğünde <strong>Hekim onayladı</strong> veya <strong>Düzeltme istendi</strong> seçeneğini kullanın. Hekim onayından sonra <strong>Kazımaya al</strong> düğmesine basın ve değişikliği kaydedin.</p>
           </article>
           <article class="panel guide-card">
             <div class="guide-heading"><span class="panel-icon" data-icon="calendar"></span><h2>Prova, teslim ve notları planlayın</h2></div>
-            <p>Açık işlerin prova ve teslim tarihleri <strong>Teslimat takvimi</strong> üzerinde görünür. Bir güne dokunup o günün işlerini açabilirsiniz. Teslimi tamamlanan bir kayıtta aşamayı <strong>Teslim edildi</strong> olarak kaydedin. Teslim edilen işler yalnızca <strong>Tamamlanan işler</strong> bölümünde görünür.</p>
+            <p><strong>Teslimat takvimi</strong> açık işlerin bitim, geçici prova ve normal prova tarihlerini gösterir. Bir güne dokunup o günün işlerini açabilirsiniz. Panodaki <strong>Yaklaşan teslimler</strong> bölümünde bitim ve geçici prova teslimlerini görebilirsiniz.</p>
+            <p>Teslimi tamamlanan bir kayıtta aşamayı <strong>Teslim edildi</strong> olarak kaydedin. Teslim edilen işler yalnızca <strong>Tamamlanan işler</strong> bölümünde görünür.</p>
             <p><strong>Hekim notları</strong> alanına provalarla ilgili geri bildirimi, <strong>Üretim notları</strong> alanına üretim ayrıntılarını girin.</p>
           </article>
           <article class="panel guide-card">
@@ -138,7 +146,6 @@
             <label>Klinik / Hekim<input name="clinic" maxlength="100" placeholder="Örn. Merkez Diş Kliniği"></label>
             <label>İş türü<select name="type" id="type-select"></select></label>
             <label id="custom-type-label" hidden>İş türünü yazın<input name="customType" maxlength="80" placeholder="Örn. Gece plağı"></label>
-            <label>Teslim tarihi<input type="date" name="due"></label>
             <label>Sorumlu teknisyen<input name="owner" maxlength="80" placeholder="Ad veya baş harfler"></label>
             <label>Asistan<input name="assistant" maxlength="80" placeholder="Varsa asistanın adı" autocomplete="off"></label>
             <label>Aşama<select name="status" id="form-status"></select></label>
@@ -154,18 +161,21 @@
               <button type="button" class="secondary" id="temporary-revise" hidden>Düzeltme istendi</button>
             </div>
           </section>
-          <details class="job-extra" id="job-extra-details">
-            <summary>Diğer iş ayrıntıları</summary>
+          <section class="job-extra" id="job-extra-details" aria-labelledby="job-extra-title">
+            <h3 id="job-extra-title">Diğer iş ayrıntıları</h3>
+            <div class="form-grid job-dates">
+              <label>Bitim teslim tarihi<input type="date" name="due"></label>
+              <label><span id="trial-date-label">Prova tarihi</span><input type="date" name="trial"></label>
+            </div>
             <div class="form-grid">
               <label>Giriş tarihi<input type="date" name="received"></label>
-              <label>Prova tarihi<input type="date" name="trial"></label>
               <label>Diş numarası / Bölge<input name="teeth" maxlength="80" placeholder="Örn. 11–13 veya üst çene"></label>
               <label>Üye / Adet<input name="units" type="number" min="1" step="1" inputmode="numeric" placeholder="Örn. 3"></label>
               <label>Renk<input name="shade" maxlength="30" placeholder="Örn. A2"></label>
             </div>
             <label class="notes">Hekim notları<textarea name="doctorNotes" rows="3" maxlength="1000" placeholder="Örn. Prova uygun."></textarea></label>
             <label class="notes">Üretim notları<textarea name="notes" rows="3" maxlength="1000" placeholder="Örn. A2 disk, kazıma sonrası kontrol"></textarea></label>
-          </details>
+          </section>
           <div class="record-meta" id="record-meta" hidden></div>
         </div>
         <section class="delete-confirmation" id="delete-confirmation" aria-labelledby="delete-confirm-title" aria-describedby="delete-confirm-message" hidden>
