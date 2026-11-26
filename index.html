@@ -2,51 +2,43 @@
 <html lang="tr">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#122331">
-  <meta name="description" content="Diş protez laboratuvarı için iş ve teslimat takibi.">
-  <title>Protez Lab — İş Takibi</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f9fc">
+  <meta name="description" content="Orilab ile diş protez işlerini, provaları ve teslimatları takip edin.">
+  <title>Orilab — İş Takibi</title>
   <meta name="protez-api-origin" content="https://protez-is-takibi-7k4m.formalibex256.chatgpt.site">
-  <link rel="icon" href="./icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./styles.css">
-  <script src="./app.js" defer></script>
+  <link rel="icon" href="./icon.svg?v=orilab" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css?v=orilab">
+  <script src="./app.js?v=orilab" defer></script>
 </head>
 <body>
   <div class="shell">
     <aside class="sidebar" id="sidebar" aria-label="Ana menü">
       <a class="brand" href="#panom">
-        <span class="brand-mark" data-icon="tooth"></span>
-        <span><strong>Protez Lab</strong><small>Laboratuvar yönetimi</small></span>
+        <img class="brand-mark" src="./icon.svg?v=orilab" width="42" height="42" alt="">
+        <span><strong>Orilab</strong><small>Diş protez laboratuvarı</small></span>
       </a>
-      <div class="nav-caption">ÇALIŞMA ALANI</div>
-      <nav class="side-nav">
+      <nav class="side-nav" aria-label="Çalışma alanı">
         <a href="#panom" data-page="panom"><span data-icon="grid"></span>Genel bakış</a>
         <a href="#isler" data-page="isler"><span data-icon="clipboard"></span>İş takibi</a>
         <a href="#takvim" data-page="takvim"><span data-icon="calendar"></span>Teslimat takvimi</a>
         <a href="#arsiv" data-page="arsiv"><span data-icon="archive"></span>Tamamlanan işler</a>
+        <a class="guide-link" href="#kilavuz" data-page="kilavuz"><span data-icon="help"></span>Nasıl kullanılır?</a>
       </nav>
-      <div class="side-bottom">
-        <button class="demo-link" type="button" id="demo-toggle"><span data-icon="flask"></span><span id="demo-label">Örnek kayıtları incele</span></button>
-        <div class="workspace">
-          <span class="workspace-mark" data-icon="layers"></span>
-          <span><strong>Laboratuvar</strong><small id="workspace-mode">Ortak iş kayıtları</small></span>
-        </div>
-      </div>
     </aside>
     <button id="nav-overlay" class="nav-overlay" type="button" aria-label="Menüyü kapat" hidden></button>
     <div class="main-shell">
       <header class="topbar">
         <div class="top-left">
           <button id="menu-toggle" class="icon-button mobile-menu" type="button" aria-label="Menüyü aç" aria-expanded="false" aria-controls="sidebar"><span data-icon="menu"></span></button>
+          <a class="mobile-brand" href="#panom">Orilab</a>
           <span class="top-crumb">Çalışma alanı</span><span class="crumb-divider" data-icon="chevron"></span><span id="breadcrumb">Genel bakış</span>
         </div>
         <div class="top-right">
-          <span class="connection" id="connection"><i></i><span>Bağlanıyor</span></span>
-          <span class="user-avatar" title="Protez Lab" aria-label="Protez Lab">PL</span>
+          <span class="connection" id="connection" role="status"><i></i><span>Bağlanıyor</span></span>
         </div>
       </header>
       <main id="main">
-        <div id="demo-banner" class="demo-banner" hidden><span data-icon="flask"></span><div><strong>Örnek kayıtlar</strong><span>Bu görünümdeki değişiklikler geçicidir.</span></div><button type="button" id="exit-demo">Canlı kayıtlara dön</button></div>
         <section class="hero">
           <div>
             <div class="date-line"><span data-icon="calendar"></span><time id="today"></time></div>
@@ -67,12 +59,12 @@
               </div>
             </div>
             <div class="filters">
-              <label class="search"><span data-icon="search"></span><input id="search" type="search" placeholder="İş no, klinik veya referans ara" aria-label="İş kayıtlarında ara"></label>
+              <label class="search"><span data-icon="search"></span><input id="search" type="search" placeholder="İş, klinik veya asistan ara" aria-label="İş kayıtlarında ara"></label>
               <label class="select-filter"><span data-icon="filter"></span><select id="status-filter" aria-label="Aşamaya göre filtrele"><option value="">Tüm aşamalar</option></select></label>
             </div>
             <div class="table-scroll">
               <table>
-                <thead><tr><th scope="col">İş no / Referans</th><th scope="col">İş türü / Klinik</th><th scope="col">Teslim</th><th scope="col">Aşama</th><th scope="col"><span class="sr-only">İş ayrıntısı</span></th></tr></thead>
+                <thead><tr><th scope="col" id="record-heading">İş</th><th scope="col">İş türü ve ekip</th><th scope="col">Teslim</th><th scope="col">Aşama</th><th scope="col"><span class="sr-only">İş ayrıntısı</span></th></tr></thead>
                 <tbody id="jobs"></tbody>
               </table>
               <div class="table-empty" id="table-empty" hidden></div>
@@ -98,26 +90,57 @@
             <div class="calendar-agenda"><h3 id="agenda-title"></h3><div id="agenda-list"></div></div>
           </section>
         </div>
+        <section id="guide-panel" class="guide-grid" aria-label="Orilab kullanım rehberi" hidden>
+          <article class="panel guide-card">
+            <div class="guide-heading"><span class="panel-icon" data-icon="plus"></span><h2>Yeni iş kaydı açın</h2></div>
+            <ol>
+              <li>Panoda <strong>Yeni iş kaydı</strong> düğmesine basın. İş tanımını yazın ve uygun iş türünü seçin. Listede yoksa <strong>Diğer</strong> seçeneğini kullanın.</li>
+              <li>Varsa klinik veya hekim bilgisini, teslim tarihini ve sorumlu teknisyeni ekleyin. İşe destek olan kişi kendi adını <strong>Asistan</strong> alanına yazabilir.</li>
+              <li>Prova tarihi, diş numarası, adet ve renk gibi bilgileri <strong>Diğer iş ayrıntıları</strong> bölümünde doldurabilirsiniz. Bildiğiniz bilgileri girip <strong>İşi kaydet</strong> düğmesine basın.</li>
+            </ol>
+            <p class="guide-note">Herkese açık olan bu uygulamada hasta adı girmeyin. İş tanımında hastayı tanımlamayan bir ifade kullanın.</p>
+          </article>
+          <article class="panel guide-card">
+            <div class="guide-heading"><span class="panel-icon" data-icon="clipboard"></span><h2>Kaydı bulun ve güncelleyin</h2></div>
+            <p><strong>İş takibi</strong> bölümünde iş tanımı, iş türü, klinik veya ekip üyesine göre arayın. Listeyi daraltmak için aşama filtresini kullanın.</p>
+            <p>Satırın sonundaki oku açın. Aşamayı seçin, gerekirse sorumlu kişiyi veya notları düzenleyin ve <strong>Değişiklikleri kaydet</strong> düğmesine basın. Önceki aşamaları iş ayrıntısındaki <strong>Aşama geçmişi</strong> bölümünde görebilirsiniz.</p>
+          </article>
+          <article class="panel guide-card">
+            <div class="guide-heading"><span class="panel-icon" data-icon="tooth"></span><h2>Geçici iş ve provayı izleyin</h2></div>
+            <p><strong>Geçici protez gerekiyor</strong> kutusunu işaretleyin. Geçici iş akışında sırasıyla <strong>Geçici basıldı</strong>, <strong>Geçici provaya gönderildi</strong> ve <strong>Geçici prova görüldü</strong> adımlarını kullanın. Her değişiklikten sonra kaydı kaydedin.</p>
+            <p>Prova görüldüğünde <strong>Hekim onayladı</strong> veya <strong>Düzeltme istendi</strong> seçeneğini kullanın. Hekim onayından sonra <strong>Kazımaya al</strong> düğmesine basın ve değişikliği kaydedin.</p>
+          </article>
+          <article class="panel guide-card">
+            <div class="guide-heading"><span class="panel-icon" data-icon="calendar"></span><h2>Prova, teslim ve notları planlayın</h2></div>
+            <p>Prova ve teslim tarihleri <strong>Teslimat takvimi</strong> üzerinde görünür. Bir güne dokunup o günün işlerini açabilirsiniz. Teslimi tamamlanan bir kayıtta aşamayı <strong>Teslim edildi</strong> olarak kaydedin. İş daha sonra <strong>Tamamlanan işler</strong> bölümünde görünür.</p>
+            <p><strong>Hekim notları</strong> alanına provalarla ilgili geri bildirimi, <strong>Üretim notları</strong> alanına üretim ayrıntılarını girin.</p>
+          </article>
+          <article class="panel guide-card">
+            <div class="guide-heading"><span class="panel-icon" data-icon="download"></span><h2>Listeyi indirin ve yedek alın</h2></div>
+            <p><strong>CSV indir</strong> seçili görünümdeki işleri tablo olarak indirir. <strong>Yedek al</strong> bütün işleri ve aşama geçmişini içeren bir JSON dosyası oluşturur. Yedeği, erişimini kontrol ettiğiniz bir yerde saklayın.</p>
+          </article>
+          <article class="panel guide-card">
+            <div class="guide-heading"><span class="panel-icon" data-icon="menu"></span><h2>Telefondan veya bilgisayardan açın</h2></div>
+            <p>Telefon ekranında sol üstteki menü düğmesinden bölümler arasında geçin. Bilgisayarda aynı bölümler sol menüde görünür. İki cihazda da kaydı açıp değişiklikleri kaydederek güncelleyebilirsiniz.</p>
+            <p>Bağlantı kesilirse formu açık tutun. Bağlantı geri geldiğinde kaydetmeyi tekrar deneyin. Aynı işi başka biri güncellediyse son sürümü açıp değişikliklerinizi ona göre girin.</p>
+          </article>
+        </section>
       </main>
     </div>
   </div>
   <dialog class="job-dialog" id="job-dialog" aria-labelledby="dialog-title">
     <form id="job-form">
-      <div class="dialog-head"><div><div class="dialog-kicker" id="dialog-kicker">İŞ KABUL</div><h2 id="dialog-title">Yeni iş kaydı</h2></div><button class="icon-button" type="button" data-close aria-label="Kapat"><span data-icon="x"></span></button></div>
+      <div class="dialog-head"><h2 id="dialog-title">Yeni iş kaydı</h2><button class="icon-button" type="button" data-close aria-label="Kapat"><span data-icon="x"></span></button></div>
       <div class="dialog-body">
         <div class="form-grid">
+          <label id="public-job-label">İş tanımı<input name="patientCode" maxlength="60" placeholder="Örn. Üst çene zirkon"></label>
           <label>Klinik / Hekim<input name="clinic" maxlength="100" placeholder="Örn. Merkez Diş Kliniği"></label>
-          <label>İş referansı<input name="patientCode" maxlength="60" placeholder="Örn. LAB-1042" aria-describedby="reference-help"><small id="reference-help">Laboratuvarın kendi iş kodunu yazabilirsiniz.</small></label>
           <label>İş türü<select name="type" id="type-select"></select></label>
           <label id="custom-type-label" hidden>İş türünü yazın<input name="customType" maxlength="80" placeholder="Örn. Gece plağı"></label>
-          <label>Giriş tarihi<input type="date" name="received"></label>
           <label>Teslim tarihi<input type="date" name="due"></label>
-          <label>Prova tarihi<input type="date" name="trial"></label>
-          <label>Aşama<select name="status" id="form-status"></select></label>
           <label>Sorumlu teknisyen<input name="owner" maxlength="80" placeholder="Ad veya baş harfler"></label>
-          <label>Diş numarası / Bölge<input name="teeth" maxlength="80" placeholder="Örn. 11–13 veya üst çene"></label>
-          <label>Üye / Adet<input name="units" type="number" min="1" step="1" inputmode="numeric" placeholder="Örn. 3"></label>
-          <label>Renk<input name="shade" maxlength="30" placeholder="Örn. A2"></label>
+          <label>Asistan<input name="assistant" maxlength="80" placeholder="Varsa asistanın adı" autocomplete="off"></label>
+          <label>Aşama<select name="status" id="form-status"></select></label>
         </div>
         <label class="checkbox"><input type="checkbox" name="temporary">Geçici protez gerekiyor</label>
         <section class="temporary-flow" id="temporary-flow" aria-labelledby="temporary-flow-title" hidden>
@@ -130,8 +153,18 @@
             <button type="button" class="secondary" id="temporary-revise" hidden>Düzeltme istendi</button>
           </div>
         </section>
-        <label class="notes">Hekim notları<textarea name="doctorNotes" rows="3" maxlength="1000" placeholder="Örn. Yükseklik fazla, tam oturmuyor veya prova uygun."></textarea></label>
-        <label class="notes">Üretim notları<textarea name="notes" rows="3" maxlength="1000" placeholder="Örn. A2 disk, kazıma sonrası kontrol"></textarea></label>
+        <details class="job-extra" id="job-extra-details">
+          <summary>Diğer iş ayrıntıları</summary>
+          <div class="form-grid">
+            <label>Giriş tarihi<input type="date" name="received"></label>
+            <label>Prova tarihi<input type="date" name="trial"></label>
+            <label>Diş numarası / Bölge<input name="teeth" maxlength="80" placeholder="Örn. 11–13 veya üst çene"></label>
+            <label>Üye / Adet<input name="units" type="number" min="1" step="1" inputmode="numeric" placeholder="Örn. 3"></label>
+            <label>Renk<input name="shade" maxlength="30" placeholder="Örn. A2"></label>
+          </div>
+          <label class="notes">Hekim notları<textarea name="doctorNotes" rows="3" maxlength="1000" placeholder="Örn. Prova uygun."></textarea></label>
+          <label class="notes">Üretim notları<textarea name="notes" rows="3" maxlength="1000" placeholder="Örn. A2 disk, kazıma sonrası kontrol"></textarea></label>
+        </details>
         <div class="record-meta" id="record-meta" hidden></div>
         <p class="form-error" id="form-error" role="alert" hidden></p>
       </div>

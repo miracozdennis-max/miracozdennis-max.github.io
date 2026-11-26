@@ -38,7 +38,8 @@ const pages = {
   panom: ["Genel bakış", "Laboratuvar panosu", "İş kabulden teslimata, tüm protez işlerinizi takip edin."],
   isler: ["İş takibi", "İş takibi", "Aktif kayıtları arayın, düzenleyin ve üretim aşamalarını güncelleyin."],
   takvim: ["Teslimat takvimi", "Teslimat takvimi", "Teslim ve prova tarihlerini gün gün görün."],
-  arsiv: ["Tamamlanan işler", "Tamamlanan işler", "Teslim edilen protez işlerine ve ayrıntılarına ulaşın."]
+  arsiv: ["Tamamlanan işler", "Tamamlanan işler", "Teslim edilen protez işlerine ve ayrıntılarına ulaşın."],
+  kilavuz: ["Nasıl kullanılır", "Nasıl kullanılır?", "İş kaydından teslimata kadar Orilab'ı kullanmayı öğrenin."]
 };
 const icons = {
   tooth: '<path d="M12 5.8c-1.4-.3-2.2-1.7-4.6-1.5C3.5 4.7 3 8.6 4.6 12c1.1 2.5 1.1 6.4 3.1 6.8 1.8.4 1.6-5.1 4.3-5.1s2.5 5.5 4.3 5.1c2-.4 2-4.3 3.1-6.8C21 8.6 20.5 4.7 16.6 4.3c-2.4-.2-3.2 1.2-4.6 1.5Z"/><path d="M10.2 5.3c1.7 1.2 3 1.7 4.3 1.3"/>',
@@ -46,7 +47,7 @@ const icons = {
   clipboard: '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2M8 11h8m-8 5h6"/>',
   calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18m-13 5h2m4 0h2"/>',
   archive: '<rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v11h14V9m-9 4h4"/>',
-  flask: '<path d="M9 3h6m-5 0v6l-5.4 8.6A2.2 2.2 0 0 0 6.5 21h11a2.2 2.2 0 0 0 1.9-3.4L14 9V3M7.5 15h9"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9 9a3 3 0 0 1 6 0c0 2-3 2-3 4m0 3h.01"/>',
   layers: '<path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5m-18 4 9 5 9-5"/>',
   menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
   chevron: '<path d="m9 6 6 6-6 6"/>',
@@ -77,19 +78,20 @@ const monthFormat = new Intl.DateTimeFormat("tr-TR", { month: "long", year: "num
 const timeFormat = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Istanbul" });
 const asDate = (date) => new Date(date + "T12:00:00Z");
 const displayDate = (date) => date ? shortDate.format(asDate(date)) : "—";
-const number = (id) => "PL-" + String(id).padStart(4, "0");
 const dateOnly = (date) => date.toISOString().slice(0, 10);
-const dayOffset = (date, days) => dateOnly(new Date(asDate(date).getTime() + days * 86400000));
 const openStatus = (job) => job.status !== "teslim";
 const typeName = (job) => job.type || "İş türü girilmedi";
+const jobDescription = (job) => {
+  const description = (job.patientCode || "").trim();
+  return /^PL[\s-]*\d+$/i.test(description) ? "" : description;
+};
+const jobTitle = (job) => jobDescription(job) || job.type || "İş kaydı";
 
 let today = todayString();
 let calendarMonth = today.slice(0, 7);
 let agendaDay = today;
 let selectedPage = "panom";
 let jobs = [];
-let demoJobs = [];
-let demo = false;
 let ready = false;
 let loadFailure = "";
 let jobsTag = "";
@@ -108,26 +110,6 @@ const form = $("#job-form");
 const dialog = $("#job-dialog");
 const controls = form.elements;
 const sortActive = (a, b) => (a.due || "9999").localeCompare(b.due || "9999") || b.id - a.id;
-const currentJobs = () => demo ? demoJobs : jobs;
-
-function demoData() {
-  return [
-    [24, "VK-1048", "İmplant üstü zirkon", "Mavi Ağız ve Diş Kliniği", 0, "kazima", 1],
-    [23, "VK-1047", "Diş üstü zirkon", "Park Diş Polikliniği", 1, "gecici_goruldu", 0],
-    [22, "VK-1046", "Total protez", "Merkez Diş Kliniği", 2, "hazir", -1],
-    [21, "VK-1045", "Diş üstü geçici", "Mavi Ağız ve Diş Kliniği", 3, "gecici", null],
-    [20, "VK-1044", "İmplant üstü hibrit", "Kıyı Diş Kliniği", 4, "tasarim", 2],
-    [19, "VK-1043", "Metal destekli porselen", "Park Diş Polikliniği", 6, "uretim", null],
-    [18, "VK-1042", "Bölümlü protez", "Merkez Diş Kliniği", 7, "prova", 4],
-    [17, "VK-1041", "Tamir / Besleme", "Kıyı Diş Kliniği", -1, "hazir", null],
-    [16, "VK-1040", "Diş üstü zirkon", "Park Diş Polikliniği", -2, "teslim", null]
-  ].map(([id, patientCode, type, clinic, due, status, trial]) => ({
-    id, patientCode, type, clinic, status, due: dayOffset(today, due), received: dayOffset(today, -6),
-    trial: trial === null ? "" : dayOffset(today, trial), owner: "AT", teeth: "11–13", units: 3,
-    shade: "A2", notes: "", doctorNotes: id === 23 ? "Geçici prova uygun. Hekim onayı bekleniyor." : "",
-    temporary: id === 24 || temporaryStages.has(status), version: 1, updatedAt: new Date().toISOString()
-  }));
-}
 
 async function api(path, options = {}) {
   const response = await fetch(new URL(path, apiOrigin), {
@@ -165,25 +147,23 @@ async function refresh(quiet = false) {
     if (sequence !== snapshotSequence) return;
     loadFailure = error instanceof TypeError ? "Bağlantı kesildi. İnternet bağlantınızı kontrol edin." : error.message;
   }
-  if (!demo && (!quiet || !dialog.open)) render();
+  if (quiet && dialog.open) showConnection();
+  else render();
 }
 
 function showConnection() {
-  const state = demo ? "demo" : loadFailure ? "error" : ready ? "online" : "loading";
+  const state = loadFailure ? "error" : ready ? "online" : "loading";
   const connection = $("#connection");
   connection.dataset.state = state;
-  connection.lastElementChild.textContent = { demo: "Örnek görünüm", error: "Bağlantı sorunu", online: "Çevrimiçi", loading: "Bağlanıyor" }[state];
-  $("#load-error").hidden = demo || !loadFailure;
+  connection.lastElementChild.textContent = { error: "Bağlantı sorunu", online: "Çevrimiçi", loading: "Bağlanıyor" }[state];
+  $("#load-error").hidden = !loadFailure || selectedPage === "kilavuz";
   $("#load-error-text").textContent = loadFailure;
-  $("#demo-banner").hidden = !demo;
-  $("#demo-label").textContent = demo ? "Canlı kayıtlara dön" : "Örnek kayıtları incele";
-  $("#workspace-mode").textContent = demo ? "Örnek görünüm" : "Ortak iş kayıtları";
-  $(".new-button").disabled = !demo && (!ready || !!loadFailure);
-  $("#backup").disabled = demo || !ready || !!loadFailure;
+  $(".new-button").disabled = !ready || !!loadFailure;
+  $("#backup").disabled = !ready || !!loadFailure;
 }
 
 function renderMetrics() {
-  const active = currentJobs().filter(openStatus);
+  const active = jobs.filter(openStatus);
   const todayJobs = active.filter((job) => job.due === today);
   const overdue = active.filter((job) => job.due && job.due < today);
   const tiles = [
@@ -196,7 +176,7 @@ function renderMetrics() {
   ];
   const oldFocus = document.activeElement?.dataset.metric;
   $("#metrics").innerHTML = tiles.map(([key, label, count, hint, glyph, color]) =>
-    '<button class="metric" type="button" data-metric="' + key + '" aria-pressed="' + (metricFilter === key) + '"' + (!ready && !demo ? " disabled" : "") + '><span><span class="metric-label">' + label + '</span><strong class="metric-number">' + (ready || demo ? count : "—") + '</strong></span>' + icon(glyph, "metric-icon " + color) + '<span class="metric-note">' + hint + "</span></button>"
+    '<button class="metric" type="button" data-metric="' + key + '" aria-pressed="' + (metricFilter === key) + '"' + (!ready ? " disabled" : "") + '><span><span class="metric-label">' + label + '</span><strong class="metric-number">' + (ready ? count : "—") + '</strong></span>' + icon(glyph, "metric-icon " + color) + '<span class="metric-note">' + hint + "</span></button>"
   ).join("");
   if (oldFocus) $("#metrics").querySelector('[data-metric="' + oldFocus + '"]')?.focus({ preventScroll: true });
 }
@@ -204,13 +184,17 @@ function renderMetrics() {
 function filteredJobs() {
   const query = $("#search").value.trim().toLocaleLowerCase("tr-TR");
   const stage = $("#status-filter").value;
-  let list = currentJobs();
+  let list = jobs;
   if (selectedPage === "arsiv") list = list.filter((job) => !openStatus(job));
   if (selectedPage === "isler" || metricFilter === "active") list = list.filter(openStatus);
   if (metricFilter === "today") list = list.filter((job) => openStatus(job) && job.due === today);
   if (stage === "temporary") list = list.filter((job) => job.temporary || temporaryStages.has(job.status));
   else if (stage) list = list.filter((job) => job.status === stage);
-  if (query) list = list.filter((job) => [number(job.id), job.patientCode, job.clinic, job.type, job.owner].join(" ").toLocaleLowerCase("tr-TR").includes(query));
+  if (query) {
+    list = list.filter((job) => [jobDescription(job), job.clinic, job.type, job.owner, job.assistant].some(
+      (value) => (value || "").toLocaleLowerCase("tr-TR").includes(query)
+    ));
+  }
   return [...list].sort((a, b) => selectedPage === "arsiv"
     ? b.updatedAt.localeCompare(a.updatedAt)
     : Number(!openStatus(a)) - Number(!openStatus(b)) || sortActive(a, b));
@@ -221,21 +205,24 @@ function renderJobs() {
   const visible = list.slice(0, pageLimit);
   const focusedJob = $("#jobs").contains(document.activeElement) ? document.activeElement.dataset.job : null;
   $("#jobs").innerHTML = visible.map((job) =>
-    '<tr class="job-row"><td><span class="cell-main case">' + number(job.id) + '</span><span class="cell-sub">' + escapeHtml(job.patientCode) +
-    '</span></td><td><span class="cell-main">' + escapeHtml(typeName(job)) + '</span><span class="cell-sub">' + escapeHtml(job.clinic) +
-    '</span></td><td><span class="cell-main date-cell' + (openStatus(job) && job.due && job.due < today ? " date-late" : "") + '">' + displayDate(job.due) +
+    '<tr class="job-row"><td><span class="cell-main case">' + escapeHtml(jobTitle(job)) +
+    '</span></td><td><span class="cell-main">' + escapeHtml(typeName(job)) + '</span>' +
+    (job.clinic ? '<span class="cell-sub">' + escapeHtml(job.clinic) + '</span>' : '') +
+    (job.owner ? '<span class="cell-sub">Teknisyen · ' + escapeHtml(job.owner) + '</span>' : '') +
+    (job.assistant ? '<span class="cell-sub">Asistan · ' + escapeHtml(job.assistant) + '</span>' : '') +
+    '</td><td><span class="cell-main date-cell' + (openStatus(job) && job.due && job.due < today ? " date-late" : "") + '">' + displayDate(job.due) +
     '</span></td><td><span class="badge status-' + job.status + '">' + statuses[job.status] +
-    '</span></td><td><button class="open-job" type="button" data-job="' + job.id + '" aria-label="' + number(job.id) + ' ayrıntısını aç">' + icon("chevron") + '</button></td></tr>'
+    '</span></td><td><button class="open-job" type="button" data-job="' + job.id + '" aria-label="' + escapeHtml(jobTitle(job)) + ' ayrıntısını aç">' + icon("chevron") + '</button></td></tr>'
   ).join("");
   const empty = $("#table-empty");
   empty.hidden = !!list.length;
   if (!list.length) {
     const hasFilter = !!($("#search").value || $("#status-filter").value || metricFilter);
-    const title = !ready && !demo ? (loadFailure ? "Kayıtlar yüklenemedi" : "Kayıtlar yükleniyor") : hasFilter ? "Eşleşen iş bulunamadı" : selectedPage === "arsiv" ? "Henüz teslim edilen iş yok" : "Henüz kayıt yok";
+    const title = !ready ? (loadFailure ? "Kayıtlar yüklenemedi" : "Kayıtlar yükleniyor") : hasFilter ? "Eşleşen iş bulunamadı" : selectedPage === "arsiv" ? "Henüz teslim edilen iş yok" : "Henüz kayıt yok";
     const hint = hasFilter ? "Aramayı veya aşama filtresini değiştirin." : selectedPage === "arsiv" ? "Teslim edildi aşamasındaki işler burada görünür." : "Laboratuvara gelen ilk işi kaydedin.";
     empty.innerHTML = icon("clipboard", "empty-icon mint") + "<strong>" + title + "</strong>" +
-      (ready || demo ? "<p>" + hint + "</p>" : "") +
-      ((ready || demo) && !loadFailure && !hasFilter && selectedPage !== "arsiv" ? '<button type="button" class="secondary" data-new>' + icon("plus") + " Yeni iş kaydı</button>" : "");
+      (ready ? "<p>" + hint + "</p>" : "") +
+      (ready && !loadFailure && !hasFilter && selectedPage !== "arsiv" ? '<button type="button" class="secondary" data-new>' + icon("plus") + " Yeni iş kaydı</button>" : "");
   }
   $("#result-count").textContent = list.length > visible.length ? visible.length + " / " + list.length + " kayıt" : list.length + " kayıt";
   $("#more-jobs").hidden = list.length <= visible.length;
@@ -246,13 +233,15 @@ function renderJobs() {
 function deadlineButton(job, date, detail) {
   const day = asDate(date);
   const month = new Intl.DateTimeFormat("tr-TR", { month: "short", timeZone: "UTC" }).format(day);
+  const title = jobTitle(job);
+  const description = [detail, job.type !== title ? job.type : ""].filter(Boolean).join(" · ");
   return '<button type="button" class="deadline" data-job="' + job.id + '"><span class="date-tile"><strong>' + day.getUTCDate() +
-    "</strong><small>" + month + '</small></span><span class="deadline-copy"><span class="cell-main">' + escapeHtml(typeName(job)) +
-    '</span><span class="cell-sub">' + number(job.id) + " · " + escapeHtml(detail) + "</span></span>" + icon("chevron") + "</button>";
+    "</strong><small>" + month + '</small></span><span class="deadline-copy"><span class="cell-main">' + escapeHtml(title) +
+    '</span><span class="cell-sub">' + escapeHtml(description) + "</span></span>" + icon("chevron") + "</button>";
 }
 
 function renderDeadlines() {
-  const upcoming = currentJobs().filter((job) => openStatus(job) && job.due >= today).sort(sortActive).slice(0, 5);
+  const upcoming = jobs.filter((job) => openStatus(job) && job.due >= today).sort(sortActive).slice(0, 5);
   $("#deadline-list").innerHTML = upcoming.length ? upcoming.map((job) => deadlineButton(job, job.due, job.due === today ? "Bugün" : job.clinic)).join("") :
     '<p class="small-empty">Yaklaşan teslim tarihi olan açık iş yok.</p>';
 }
@@ -264,7 +253,7 @@ function renderCalendar() {
   const length = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
   const offset = (first.getUTCDay() + 6) % 7;
   const monthDays = new Map();
-  for (const job of currentJobs()) {
+  for (const job of jobs) {
     if (!openStatus(job)) continue;
     for (const [key, label] of [["due", "Teslim"], ["trial", "Prova"]]) {
       const date = job[key];
@@ -293,7 +282,7 @@ function renderCalendar() {
   if (focusedDay) $("#calendar-grid").querySelector('[data-day="' + focusedDay + '"]')?.focus({ preventScroll: true });
   $("#agenda-title").textContent = longDate.format(asDate(agendaDay));
   const entries = monthDays.get(agendaDay) || [];
-  $("#agenda-list").innerHTML = entries.length ? entries.map(({ job, label }) => deadlineButton(job, agendaDay, label + " · " + job.clinic)).join("") :
+  $("#agenda-list").innerHTML = entries.length ? entries.map(({ job, label }) => deadlineButton(job, agendaDay, [label, job.clinic].filter(Boolean).join(" · "))).join("") :
     '<p class="small-empty">Bu gün için planlanmış teslim veya prova yok.</p>';
 }
 
@@ -303,16 +292,19 @@ function render() {
   $("#today").textContent = longDate.format(asDate(today));
   showConnection();
   $("#metrics").hidden = selectedPage !== "panom";
-  $("#content-grid").classList.toggle("full", selectedPage !== "panom");
+  const content = $("#content-grid");
+  content.hidden = selectedPage === "kilavuz";
+  content.classList.toggle("full", selectedPage !== "panom");
   $("#deadlines").hidden = selectedPage !== "panom";
-  $("#job-panel").hidden = selectedPage === "takvim";
+  $("#job-panel").hidden = selectedPage === "takvim" || selectedPage === "kilavuz";
   $("#calendar-panel").hidden = selectedPage !== "takvim";
+  $("#guide-panel").hidden = selectedPage !== "kilavuz";
   if (selectedPage === "panom") {
     renderMetrics();
     renderDeadlines();
   }
   if (selectedPage === "takvim") renderCalendar();
-  else renderJobs();
+  else if (selectedPage !== "kilavuz") renderJobs();
 }
 
 function updatePage() {
@@ -343,15 +335,6 @@ function resetFilters() {
   $("#status-filter").value = "";
   metricFilter = "";
   pageLimit = 10;
-}
-
-function toggleDemo(enabled) {
-  if (enabled && !demoJobs.length) demoJobs = demoData();
-  demo = enabled;
-  resetFilters();
-  setMenu(false);
-  render();
-  if (!demo) refresh(true);
 }
 
 function setMenu(open, restoreFocus = false) {
@@ -410,26 +393,28 @@ function showFormError(message) {
 }
 
 async function openJob(id) {
-  const job = id === null ? null : currentJobs().find((entry) => entry.id === id);
-  if ((!job && id !== null) || (!demo && (!ready || loadFailure))) return;
+  if (!ready || loadFailure || dialog.open || saving) return;
+  const job = id === null ? null : jobs.find((entry) => entry.id === id);
+  if (!job && id !== null) return;
   const token = ++modalToken;
   dialogSource = document.activeElement;
   editId = id;
   editVersion = job?.version ?? null;
-  submissionKey = job || demo ? "" : crypto.randomUUID();
+  submissionKey = job ? "" : crypto.randomUUID();
   form.reset();
+  $("#job-extra-details").open = false;
   showFormError("");
   const title = $("#dialog-title");
-  title.textContent = job ? "İş ayrıntısı" : "Yeni iş kaydı";
-  $("#dialog-kicker").textContent = job ? number(job.id) : "İŞ KABUL";
+  title.textContent = job ? jobTitle(job) : "Yeni iş kaydı";
   $("#save-job").lastElementChild.textContent = job ? "Değişiklikleri kaydet" : "İşi kaydet";
   const recordMeta = $("#record-meta");
   recordMeta.hidden = true;
   recordMeta.replaceChildren();
   if (job) {
-    for (const field of ["patientCode", "clinic", "received", "due", "trial", "status", "owner", "teeth", "units", "shade", "notes", "doctorNotes"]) {
+    for (const field of ["clinic", "received", "due", "trial", "status", "owner", "assistant", "teeth", "units", "shade", "notes", "doctorNotes"]) {
       controls[field].value = job[field] ?? "";
     }
+    controls.patientCode.value = jobDescription(job);
     controls.temporary.checked = job.temporary;
     const custom = job.type && !types.includes(job.type);
     controls.type.value = custom ? "__custom" : job.type;
@@ -442,14 +427,15 @@ async function openJob(id) {
   renderTemporaryWorkflow();
   dialog.showModal();
   $(".dialog-body").scrollTop = 0;
-  if (!job || demo) return;
+  if (!job) return;
   try {
     const record = await api("/api/jobs/" + id);
     if (token !== modalToken || !dialog.open) return;
     if (record.version !== editVersion) showFormError("Bu kayıt güncellendi. Son sürümü görmek için kapatıp yeniden açın.");
-    recordMeta.innerHTML = '<details><summary>Aşama geçmişi</summary><ul>' + record.history.map((entry) =>
+    const entries = record.history || [];
+    recordMeta.innerHTML = '<details><summary>Aşama geçmişi</summary><ul>' + entries.map((entry) =>
       "<li>" + statuses[entry.status] + " · " + timeFormat.format(new Date(entry.at)) + "</li>").join("") + "</ul></details>";
-    recordMeta.hidden = !record.history.length;
+    recordMeta.hidden = !entries.length;
   } catch {
     if (token === modalToken && dialog.open) {
       recordMeta.textContent = "Aşama geçmişi şu anda görüntülenemiyor.";
@@ -464,34 +450,32 @@ async function saveJob(event) {
   const data = Object.fromEntries(new FormData(form));
   data.type = data.type === "__custom" ? data.customType : data.type;
   delete data.customType;
+  const existing = jobs.find((job) => job.id === editId);
+  if (!data.patientCode && existing && !jobDescription(existing)) {
+    data.patientCode = existing.patientCode;
+  }
   data.temporary = controls.temporary.checked;
   data.units = data.units ? Number(data.units) : null;
   data.version = editVersion;
-  if (editId === null && !demo) data.submissionKey = submissionKey;
-  for (const field of ["clinic", "patientCode", "owner", "type", "teeth", "shade", "notes", "doctorNotes"]) data[field] = data[field].trim();
+  if (editId === null) data.submissionKey = submissionKey;
+  for (const field of ["clinic", "patientCode", "owner", "assistant", "type", "teeth", "shade", "notes", "doctorNotes"]) {
+    data[field] = (data[field] || "").trim();
+  }
   showFormError("");
   const id = editId;
   const button = $("#save-job");
   saving = true;
   button.disabled = true;
   try {
-    let saved;
-    if (demo) {
-      const recordId = id ?? Math.max(0, ...demoJobs.map((job) => job.id)) + 1;
-      saved = { ...data, id: recordId, version: (editVersion ?? 0) + 1, updatedAt: new Date().toISOString() };
-      demoJobs = [...demoJobs.filter((job) => job.id !== recordId), saved];
-    } else {
-      saved = await api("/api/jobs" + (id === null ? "" : "/" + id), {
-        method: id === null ? "POST" : "PUT", body: JSON.stringify(data)
-      });
-      snapshotSequence++;
-      jobs = [...jobs.filter((job) => job.id !== saved.id), saved];
-      loadFailure = "";
-    }
+    const saved = await api("/api/jobs" + (id === null ? "" : "/" + id), {
+      method: id === null ? "POST" : "PUT", body: JSON.stringify(data)
+    });
+    snapshotSequence++;
+    jobs = [...jobs.filter((job) => job.id !== saved.id), saved];
+    loadFailure = "";
     dialog.close();
-    render();
-    notify(number(saved.id) + (id === null ? " kaydedildi." : " güncellendi."));
-    if (!demo) refresh(true);
+    notify(id === null ? "İş kaydedildi." : "İş güncellendi.");
+    refresh(true);
   } catch (error) {
     showFormError(error instanceof TypeError ? "Bağlantı kurulamadı. Tekrar deneyin." : error.message);
     if (error.status === 409) {
@@ -523,15 +507,15 @@ function downloadFile(blob, filename) {
 }
 
 function exportCsv() {
-  const columns = ["İş no", "İş referansı", "Klinik / Hekim", "İş türü", "Giriş", "Teslim", "Prova", "Aşama", "Teknisyen", "Diş / Bölge", "Adet", "Renk", "Geçici", "Üretim notları", "Hekim notları"];
-  const cells = (job) => [number(job.id), job.patientCode, job.clinic, job.type, job.received, job.due, job.trial, statuses[job.status], job.owner, job.teeth, job.units, job.shade, job.temporary ? "Evet" : "Hayır", job.notes, job.doctorNotes];
+  const columns = ["İş tanımı", "Klinik / Hekim", "İş türü", "Giriş", "Teslim", "Prova", "Aşama", "Teknisyen", "Asistan", "Diş / Bölge", "Adet", "Renk", "Geçici", "Üretim notları", "Hekim notları"];
+  const cells = (job) => [jobDescription(job), job.clinic, job.type, job.received, job.due, job.trial, statuses[job.status], job.owner, job.assistant, job.teeth, job.units, job.shade, job.temporary ? "Evet" : "Hayır", job.notes, job.doctorNotes];
   const quote = (value) => {
     let cell = String(value ?? "");
     if (/^[\s\uFEFF]*[=+\-@]|^[\t\r\n]/.test(cell)) cell = "'" + cell;
     return '"' + cell.replaceAll('"', '""') + '"';
   };
   const content = "\uFEFF" + [columns, ...filteredJobs().map(cells)].map((row) => row.map(quote).join(";")).join("\r\n");
-  downloadFile(new Blob([content], { type: "text/csv;charset=utf-8" }), (demo ? "ornek-" : "") + "protez-isleri-" + today + ".csv");
+  downloadFile(new Blob([content], { type: "text/csv;charset=utf-8" }), "orilab-isleri-" + today + ".csv");
 }
 
 async function downloadBackup() {
@@ -540,11 +524,11 @@ async function downloadBackup() {
   try {
     const backup = await api("/api/backup");
     const file = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
-    downloadFile(file, "protez-lab-yedek-" + today + ".json");
+    downloadFile(file, "orilab-yedek-" + today + ".json");
   } catch {
     notify("Yedek indirilemedi. Yeniden deneyin.");
   } finally {
-    button.disabled = demo || !ready || !!loadFailure;
+    button.disabled = !ready || !!loadFailure;
   }
 }
 
@@ -576,11 +560,21 @@ $("#temporary-next").addEventListener("click", (event) => {
 $("#temporary-revise").addEventListener("click", () => {
   if (saving) return;
   selectJobStage("gecici_duzeltme");
+  $("#job-extra-details").open = true;
   controls.doctorNotes.focus();
 });
 form.addEventListener("submit", saveJob);
+form.addEventListener("invalid", (event) => {
+  const details = event.target.closest("details");
+  if (details) details.open = true;
+}, true);
 dialog.addEventListener("cancel", (event) => { if (saving) event.preventDefault(); });
-dialog.addEventListener("close", () => { dialogSource?.focus(); if (!demo) render(); });
+dialog.addEventListener("close", () => {
+  const sourceJob = dialogSource?.dataset.job;
+  render();
+  const source = dialogSource?.isConnected ? dialogSource : document.querySelector('[data-job="' + sourceJob + '"]');
+  (source || $(".new-button")).focus();
+});
 document.addEventListener("click", (event) => {
   const button = event.target.closest("button");
   if (!button) return;
@@ -612,8 +606,6 @@ $("#menu-toggle").addEventListener("click", () => setMenu($("#nav-overlay").hidd
 $("#nav-overlay").addEventListener("click", () => setMenu(false, true));
 $("#sidebar").addEventListener("keydown", (event) => { if (event.key === "Escape") setMenu(false, true); });
 $("#sidebar nav").addEventListener("click", () => setMenu(false, true));
-$("#demo-toggle").addEventListener("click", () => toggleDemo(!demo));
-$("#exit-demo").addEventListener("click", () => toggleDemo(false));
 $("#retry").addEventListener("click", () => refresh());
 $("#previous-month").addEventListener("click", () => changeMonth(-1));
 $("#next-month").addEventListener("click", () => changeMonth(1));
@@ -624,8 +616,7 @@ $("#current-month").addEventListener("click", () => {
   renderCalendar();
 });
 window.addEventListener("hashchange", updatePage);
-window.addEventListener("focus", () => { if (!demo && !saving) refresh(true); });
-setInterval(() => { if (!demo && !document.hidden && !saving) refresh(true); }, 45000);
-if (new URLSearchParams(location.search).get("demo") === "1") toggleDemo(true);
+window.addEventListener("focus", () => { if (!saving) refresh(true); });
+setInterval(() => { if (!document.hidden && !saving) refresh(true); }, 45000);
 updatePage();
-if (!demo) refresh();
+refresh();
