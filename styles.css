@@ -172,7 +172,7 @@ td { border-top: 1px solid #eaf0f2; vertical-align: middle; font-size: 12px; }
 .guide-card { padding: 20px; }
 .guide-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 11px; }
 .guide-card p, .guide-card ol { color: var(--muted); font-size: 14px; line-height: 1.65; }
-.guide-card p + p, .guide-card li + li, .guide-card .guide-note { margin-top: 9px; }
+.guide-card p + p, .guide-card li + li { margin-top: 9px; }
 .guide-card ol { margin: 0; padding-inline-start: 22px; }
 .guide-card li::marker, .guide-card strong { color: var(--ink); font-weight: 670; }
 .load-error { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 13px; margin-bottom: 18px; border: 1px solid #efd0c5; border-radius: 9px; background: #fff3ef; color: #8b382c; font-size: 12px; }
