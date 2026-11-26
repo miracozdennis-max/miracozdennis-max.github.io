@@ -2,6 +2,7 @@
 
 const $ = (selector) => document.querySelector(selector);
 const apiOrigin = $('meta[name="protez-api-origin"]').content;
+const deleteWaitMs = 4000;
 const statuses = {
   kabul: "İş kabul",
   tasarim: "Tasarımda",
@@ -102,7 +103,9 @@ let editVersion = null;
 let submissionKey = "";
 let modalToken = 0;
 let snapshotSequence = 0;
-let saving = false;
+let mutationPending = false;
+let deleteDeadline = null;
+let deleteTimeout;
 let toastTimeout;
 let dialogSource;
 
@@ -184,10 +187,9 @@ function renderMetrics() {
 function filteredJobs() {
   const query = $("#search").value.trim().toLocaleLowerCase("tr-TR");
   const stage = $("#status-filter").value;
-  let list = jobs;
-  if (selectedPage === "arsiv") list = list.filter((job) => !openStatus(job));
-  if (selectedPage === "isler" || metricFilter === "active") list = list.filter(openStatus);
-  if (metricFilter === "today") list = list.filter((job) => openStatus(job) && job.due === today);
+  const archive = selectedPage === "arsiv";
+  let list = jobs.filter(archive ? (job) => !openStatus(job) : openStatus);
+  if (metricFilter === "today") list = list.filter((job) => job.due === today);
   if (stage === "temporary") list = list.filter((job) => job.temporary || temporaryStages.has(job.status));
   else if (stage) list = list.filter((job) => job.status === stage);
   if (query) {
@@ -195,9 +197,7 @@ function filteredJobs() {
       (value) => (value || "").toLocaleLowerCase("tr-TR").includes(query)
     ));
   }
-  return [...list].sort((a, b) => selectedPage === "arsiv"
-    ? b.updatedAt.localeCompare(a.updatedAt)
-    : Number(!openStatus(a)) - Number(!openStatus(b)) || sortActive(a, b));
+  return list.sort(archive ? (a, b) => b.updatedAt.localeCompare(a.updatedAt) : sortActive);
 }
 
 function renderJobs() {
@@ -320,7 +320,6 @@ function updatePage() {
   $("#jobs-subtitle").textContent = selectedPage === "arsiv" ? "Aşaması teslim edildi olan kayıtlar" : "Laboratuvarınızdaki işlerin güncel durumu";
   $("#status-filter").hidden = selectedPage === "arsiv";
   $("#status-filter").parentElement.hidden = selectedPage === "arsiv";
-  $("#status-filter").querySelector('[value="teslim"]').hidden = selectedPage === "isler";
   for (const link of document.querySelectorAll("[data-page]")) {
     if (link.dataset.page === selectedPage) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
@@ -392,14 +391,74 @@ function showFormError(message) {
   $("#form-error").hidden = !message;
 }
 
-async function openJob(id) {
-  if (!ready || loadFailure || dialog.open || saving) return;
+function updateDeleteCountdown() {
+  clearTimeout(deleteTimeout);
+  const confirming = deleteDeadline !== null;
+  const remaining = confirming ? deleteDeadline - performance.now() : 0;
+  const seconds = Math.ceil(remaining / 1000);
+  const waiting = remaining > 0;
+  const enabled = confirming && !waiting && !mutationPending && editVersion !== null;
+  $("#delete-confirm").disabled = !enabled;
+  $("#delete-countdown").textContent = mutationPending ? "Siliniyor…" : waiting ? seconds + " saniye bekleyin." : "Silme onayı hazır.";
+  const status = $("#delete-status");
+  const message = enabled ? "Silme onayı hazır. Sil düğmesi kullanılabilir." : "";
+  if (status.textContent !== message) status.textContent = message;
+  if (waiting) {
+    deleteTimeout = setTimeout(updateDeleteCountdown, remaining - (seconds - 1) * 1000);
+  }
+}
+
+function syncJobActions() {
+  const confirming = deleteDeadline !== null;
+  const stale = editId !== null && editVersion === null;
+  $("#delete-confirmation").hidden = !confirming;
+  $("#delete-job").hidden = editId === null || confirming;
+  $("#delete-job").disabled = mutationPending || stale;
+  $("#delete-job").setAttribute("aria-expanded", String(confirming));
+  $("#delete-cancel").disabled = mutationPending;
+  $("#save-job").disabled = mutationPending || stale || confirming;
+  const fields = $("#job-edit-fields");
+  fields.hidden = confirming;
+  fields.inert = mutationPending || confirming;
+  for (const button of dialog.querySelectorAll("[data-close]")) button.disabled = mutationPending;
+  updateDeleteCountdown();
+}
+
+function cancelDeleteConfirmation() {
+  if (mutationPending || deleteDeadline === null) return;
+  deleteDeadline = null;
+  syncJobActions();
+  showFormError("");
+  $("#delete-job").focus();
+}
+
+function startDeleteConfirmation() {
+  if (!dialog.open || mutationPending || editVersion === null || deleteDeadline !== null) return;
+  deleteDeadline = performance.now() + deleteWaitMs;
+  syncJobActions();
+  showFormError("");
+  $("#delete-confirm-title").focus();
+}
+
+function invalidateEdit(message) {
+  const wasConfirming = deleteDeadline !== null;
+  editVersion = null;
+  deleteDeadline = null;
+  syncJobActions();
+  showFormError(message);
+  if (wasConfirming && !mutationPending) dialog.querySelector("[data-close]").focus();
+}
+
+async function openJob(id, source) {
+  if (!ready || loadFailure || dialog.open || mutationPending) return;
   const job = id === null ? null : jobs.find((entry) => entry.id === id);
   if (!job && id !== null) return;
   const token = ++modalToken;
-  dialogSource = document.activeElement;
+  dialogSource = source;
   editId = id;
   editVersion = job?.version ?? null;
+  deleteDeadline = null;
+  syncJobActions();
   submissionKey = job ? "" : crypto.randomUUID();
   form.reset();
   $("#job-extra-details").open = false;
@@ -431,22 +490,29 @@ async function openJob(id) {
   try {
     const record = await api("/api/jobs/" + id);
     if (token !== modalToken || !dialog.open) return;
-    if (record.version !== editVersion) showFormError("Bu kayıt güncellendi. Son sürümü görmek için kapatıp yeniden açın.");
+    if (!mutationPending && editVersion !== null && record.version !== editVersion) {
+      invalidateEdit("Bu kayıt güncellendi. Son sürümü görmek için kapatıp yeniden açın.");
+      refresh(true);
+    }
     const entries = record.history || [];
     recordMeta.innerHTML = '<details><summary>Aşama geçmişi</summary><ul>' + entries.map((entry) =>
       "<li>" + statuses[entry.status] + " · " + timeFormat.format(new Date(entry.at)) + "</li>").join("") + "</ul></details>";
     recordMeta.hidden = !entries.length;
-  } catch {
+  } catch (error) {
     if (token === modalToken && dialog.open) {
       recordMeta.textContent = "Aşama geçmişi şu anda görüntülenemiyor.";
       recordMeta.hidden = false;
+      if (error.status === 404 && !mutationPending && editVersion !== null) {
+        invalidateEdit("Bu iş kaydı artık mevcut değil. Pencereyi kapatın.");
+        refresh(true);
+      }
     }
   }
 }
 
 async function saveJob(event) {
   event.preventDefault();
-  if (saving) return;
+  if (mutationPending || deleteDeadline !== null || (editId !== null && editVersion === null)) return;
   const data = Object.fromEntries(new FormData(form));
   data.type = data.type === "__custom" ? data.customType : data.type;
   delete data.customType;
@@ -463,9 +529,8 @@ async function saveJob(event) {
   }
   showFormError("");
   const id = editId;
-  const button = $("#save-job");
-  saving = true;
-  button.disabled = true;
+  mutationPending = true;
+  syncJobActions();
   try {
     const saved = await api("/api/jobs" + (id === null ? "" : "/" + id), {
       method: id === null ? "POST" : "PUT", body: JSON.stringify(data)
@@ -477,13 +542,56 @@ async function saveJob(event) {
     notify(id === null ? "İş kaydedildi." : "İş güncellendi.");
     refresh(true);
   } catch (error) {
-    showFormError(error instanceof TypeError ? "Bağlantı kurulamadı. Tekrar deneyin." : error.message);
-    if (error.status === 409) {
+    if (id !== null && (error.status === 409 || error.status === 404)) {
+      invalidateEdit(error.message);
       await refresh(true);
+    } else {
+      showFormError(error instanceof TypeError ? "Bağlantı kurulamadı. Tekrar deneyin." : error.message);
     }
   } finally {
-    saving = false;
-    button.disabled = false;
+    mutationPending = false;
+    syncJobActions();
+  }
+}
+
+function finishJobDeletion(id, message) {
+  snapshotSequence++;
+  jobs = jobs.filter((job) => job.id !== id);
+  jobsTag = "";
+  loadFailure = "";
+  dialog.close();
+  notify(message);
+  refresh(true);
+}
+
+async function deleteJob() {
+  if (!dialog.open || mutationPending || editVersion === null || deleteDeadline === null || performance.now() < deleteDeadline) return;
+  const id = editId;
+  mutationPending = true;
+  syncJobActions();
+  showFormError("");
+  try {
+    const result = await api("/api/jobs/" + id, {
+      method: "DELETE", body: JSON.stringify({ version: editVersion })
+    });
+    if (result?.deleted !== true) throw new Error("İş silinemedi. Tekrar deneyin.");
+    finishJobDeletion(id, "İş silindi.");
+  } catch (error) {
+    if (error.status === 404) {
+      finishJobDeletion(id, "İş kaydı artık mevcut değil.");
+    } else if (error.status === 409) {
+      invalidateEdit("Bu kayıt güncellendi. Son sürümü görmek için kapatıp yeniden açın.");
+      await refresh(true);
+    } else {
+      showFormError(error instanceof TypeError ? "Bağlantı kurulamadı. Silmeyi tekrar deneyin." : error.message);
+    }
+  } finally {
+    mutationPending = false;
+    syncJobActions();
+    if (dialog.open) {
+      const next = editVersion === null ? dialog.querySelector("[data-close]") : $("#delete-confirm");
+      next.focus();
+    }
   }
 }
 
@@ -533,9 +641,11 @@ async function downloadBackup() {
 }
 
 for (const node of document.querySelectorAll("[data-icon]")) node.innerHTML = svg(node.dataset.icon);
-const options = Object.entries(statuses).map(([key, label]) => '<option value="' + key + '">' + label + "</option>").join("");
-$("#status-filter").insertAdjacentHTML("beforeend", '<option value="temporary">Geçici içeren işler</option>' + options);
-$("#form-status").innerHTML = options;
+const renderStatusOption = ([key, label]) => '<option value="' + key + '">' + label + "</option>";
+const statusEntries = Object.entries(statuses);
+const activeStatusOptions = statusEntries.filter(([key]) => key !== "teslim").map(renderStatusOption).join("");
+$("#status-filter").insertAdjacentHTML("beforeend", '<option value="temporary">Geçici içeren işler</option>' + activeStatusOptions);
+$("#form-status").innerHTML = statusEntries.map(renderStatusOption).join("");
 $("#type-select").innerHTML = '<option value="">Seçilmedi</option>' + types.map((type) =>
   "<option>" + type + "</option>").join("") + '<option value="__custom">Diğer</option>';
 controls.type.addEventListener("change", () => {
@@ -553,12 +663,12 @@ controls.temporary.addEventListener("change", () => {
 });
 controls.status.addEventListener("change", () => selectJobStage(controls.status.value));
 $("#temporary-next").addEventListener("click", (event) => {
-  if (saving) return;
+  if (mutationPending || deleteDeadline !== null) return;
   selectJobStage(event.currentTarget.dataset.stage);
   if ($("#temporary-flow").hidden) controls.status.focus();
 });
 $("#temporary-revise").addEventListener("click", () => {
-  if (saving) return;
+  if (mutationPending || deleteDeadline !== null) return;
   selectJobStage("gecici_duzeltme");
   $("#job-extra-details").open = true;
   controls.doctorNotes.focus();
@@ -568,19 +678,34 @@ form.addEventListener("invalid", (event) => {
   const details = event.target.closest("details");
   if (details) details.open = true;
 }, true);
-dialog.addEventListener("cancel", (event) => { if (saving) event.preventDefault(); });
+$("#delete-job").addEventListener("click", startDeleteConfirmation);
+$("#delete-cancel").addEventListener("click", cancelDeleteConfirmation);
+$("#delete-confirm").addEventListener("click", deleteJob);
+$("#delete-confirm").addEventListener("keydown", (event) => {
+  if (event.repeat && (event.key === "Enter" || event.key === " ")) event.preventDefault();
+});
+dialog.addEventListener("cancel", (event) => {
+  if (mutationPending || deleteDeadline !== null) event.preventDefault();
+  cancelDeleteConfirmation();
+});
 dialog.addEventListener("close", () => {
+  if (dialog.open) return;
+  editId = null;
+  editVersion = null;
+  deleteDeadline = null;
+  syncJobActions();
   const sourceJob = dialogSource?.dataset.job;
   render();
-  const source = dialogSource?.isConnected ? dialogSource : document.querySelector('[data-job="' + sourceJob + '"]');
+  const source = dialogSource?.isConnected ? dialogSource : sourceJob && document.querySelector('[data-job="' + sourceJob + '"]');
+  dialogSource = null;
   (source || $(".new-button")).focus();
 });
 document.addEventListener("click", (event) => {
   const button = event.target.closest("button");
   if (!button) return;
-  if (button.matches("[data-new]")) openJob(null);
-  if (button.matches("[data-job]")) openJob(Number(button.dataset.job));
-  if (button.matches("[data-close]") && !saving) dialog.close();
+  if (button.matches("[data-new]")) openJob(null, button);
+  if (button.matches("[data-job]")) openJob(Number(button.dataset.job), button);
+  if (button.matches("[data-close]") && !mutationPending) dialog.close();
   if (button.matches("[data-day]")) {
     agendaDay = button.dataset.day;
     renderCalendar();
@@ -616,7 +741,7 @@ $("#current-month").addEventListener("click", () => {
   renderCalendar();
 });
 window.addEventListener("hashchange", updatePage);
-window.addEventListener("focus", () => { if (!saving) refresh(true); });
-setInterval(() => { if (!document.hidden && !saving) refresh(true); }, 45000);
+window.addEventListener("focus", () => { if (!mutationPending) refresh(true); });
+setInterval(() => { if (!document.hidden && !mutationPending) refresh(true); }, 45000);
 updatePage();
 refresh();

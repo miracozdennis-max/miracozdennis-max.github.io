@@ -205,7 +205,16 @@ td { border-top: 1px solid #eaf0f2; vertical-align: middle; font-size: 12px; }
 .job-extra[open] { padding-bottom: 12px; }
 .job-extra[open] summary::after { transform: rotate(225deg) translate(-2px,-2px); }
 .job-extra .notes { margin-top: 12px; }
-.dialog-footer { border-top: 1px solid var(--border); justify-content: end; }
+.dialog-footer { border-top: 1px solid var(--border); flex-wrap: wrap; justify-content: end; }
+.delete-job { margin-inline-end: auto; border-color: #e8c8c2; color: #922d25; }
+.delete-job:hover:not(:disabled) { border-color: #dcaaa3; background: #fff1ef; }
+.delete-confirmation { margin-top: 13px; padding: 13px; border: 1px solid #e8c8c2; border-radius: 10px; background: #fff7f5; color: #792920; }
+.delete-confirmation h3 { width: fit-content; font-size: 16px; font-weight: 730; }
+.delete-confirmation p { margin-top: 5px; font-size: 13px; line-height: 1.5; }
+#delete-countdown { font-weight: 670; font-variant-numeric: tabular-nums; }
+.delete-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.delete-confirm { min-width: 58px; background: #9b3028; }
+.delete-confirm:hover:not(:disabled) { background: #7f251f; }
 .record-meta { margin-top: 13px; color: var(--muted); font-size: 11px; }
 .record-meta summary { width: fit-content; cursor: pointer; color: var(--teal); font-weight: 680; }
 .record-meta ul { margin: 6px 0 0; padding-left: 17px; }
@@ -255,7 +264,7 @@ td { border-top: 1px solid #eaf0f2; vertical-align: middle; font-size: 12px; }
   .guide-card { padding: 15px; }
   .dialog-body input:not([type="checkbox"]), .dialog-body select, .dialog-body textarea { min-height: 44px; font-size: 16px; }
   .dialog-head .icon-button { width: 44px; min-height: 44px; }
-  .dialog-footer button, .temporary-flow-actions button { min-height: 44px; }
+  .dialog-footer button, .temporary-flow-actions button, .delete-actions button { min-height: 44px; }
 }
 @media (max-width: 470px) {
   .hero { align-items: start; flex-direction: column; gap: 11px; }

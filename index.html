@@ -8,8 +8,8 @@
   <title>Orilab — İş Takibi</title>
   <meta name="protez-api-origin" content="https://protez-is-takibi-7k4m.formalibex256.chatgpt.site">
   <link rel="icon" href="./icon.svg?v=orilab" type="image/svg+xml">
-  <link rel="stylesheet" href="./styles.css?v=orilab">
-  <script src="./app.js?v=orilab" defer></script>
+  <link rel="stylesheet" href="./styles.css?v=orilab-11">
+  <script src="./app.js?v=orilab-11" defer></script>
 </head>
 <body>
   <div class="shell">
@@ -103,6 +103,7 @@
             <div class="guide-heading"><span class="panel-icon" data-icon="clipboard"></span><h2>Kaydı bulun ve güncelleyin</h2></div>
             <p><strong>İş takibi</strong> bölümünde iş tanımı, iş türü, klinik veya ekip üyesine göre arayın. Listeyi daraltmak için aşama filtresini kullanın.</p>
             <p>Satırın sonundaki oku açın. Aşamayı seçin, gerekirse sorumlu kişiyi veya notları düzenleyin ve <strong>Değişiklikleri kaydet</strong> düğmesine basın. Önceki aşamaları iş ayrıntısındaki <strong>Aşama geçmişi</strong> bölümünde görebilirsiniz.</p>
+            <p>Yanlış bir kaydı açıp <strong>İşi sil</strong> düğmesine basın. Dört saniye sonra <strong>Sil</strong> düğmesi açılır ve yalnızca onayladığınızda iş listeden kaldırılır.</p>
           </article>
           <article class="panel guide-card">
             <div class="guide-heading"><span class="panel-icon" data-icon="tooth"></span><h2>Geçici iş ve provayı izleyin</h2></div>
@@ -111,7 +112,7 @@
           </article>
           <article class="panel guide-card">
             <div class="guide-heading"><span class="panel-icon" data-icon="calendar"></span><h2>Prova, teslim ve notları planlayın</h2></div>
-            <p>Prova ve teslim tarihleri <strong>Teslimat takvimi</strong> üzerinde görünür. Bir güne dokunup o günün işlerini açabilirsiniz. Teslimi tamamlanan bir kayıtta aşamayı <strong>Teslim edildi</strong> olarak kaydedin. İş daha sonra <strong>Tamamlanan işler</strong> bölümünde görünür.</p>
+            <p>Açık işlerin prova ve teslim tarihleri <strong>Teslimat takvimi</strong> üzerinde görünür. Bir güne dokunup o günün işlerini açabilirsiniz. Teslimi tamamlanan bir kayıtta aşamayı <strong>Teslim edildi</strong> olarak kaydedin. Teslim edilen işler yalnızca <strong>Tamamlanan işler</strong> bölümünde görünür.</p>
             <p><strong>Hekim notları</strong> alanına provalarla ilgili geri bildirimi, <strong>Üretim notları</strong> alanına üretim ayrıntılarını girin.</p>
           </article>
           <article class="panel guide-card">
@@ -131,43 +132,59 @@
     <form id="job-form">
       <div class="dialog-head"><h2 id="dialog-title">Yeni iş kaydı</h2><button class="icon-button" type="button" data-close aria-label="Kapat"><span data-icon="x"></span></button></div>
       <div class="dialog-body">
-        <div class="form-grid">
-          <label id="public-job-label">İş tanımı<input name="patientCode" maxlength="60" placeholder="Örn. Üst çene zirkon"></label>
-          <label>Klinik / Hekim<input name="clinic" maxlength="100" placeholder="Örn. Merkez Diş Kliniği"></label>
-          <label>İş türü<select name="type" id="type-select"></select></label>
-          <label id="custom-type-label" hidden>İş türünü yazın<input name="customType" maxlength="80" placeholder="Örn. Gece plağı"></label>
-          <label>Teslim tarihi<input type="date" name="due"></label>
-          <label>Sorumlu teknisyen<input name="owner" maxlength="80" placeholder="Ad veya baş harfler"></label>
-          <label>Asistan<input name="assistant" maxlength="80" placeholder="Varsa asistanın adı" autocomplete="off"></label>
-          <label>Aşama<select name="status" id="form-status"></select></label>
-        </div>
-        <label class="checkbox"><input type="checkbox" name="temporary">Geçici protez gerekiyor</label>
-        <section class="temporary-flow" id="temporary-flow" aria-labelledby="temporary-flow-title" hidden>
-          <div class="temporary-flow-head">
-            <h3 id="temporary-flow-title">Geçici iş akışı</h3>
-            <span id="temporary-phase" class="badge" role="status"></span>
+        <div id="job-edit-fields">
+          <div class="form-grid">
+            <label id="public-job-label">İş tanımı<input name="patientCode" maxlength="60" placeholder="Örn. Üst çene zirkon"></label>
+            <label>Klinik / Hekim<input name="clinic" maxlength="100" placeholder="Örn. Merkez Diş Kliniği"></label>
+            <label>İş türü<select name="type" id="type-select"></select></label>
+            <label id="custom-type-label" hidden>İş türünü yazın<input name="customType" maxlength="80" placeholder="Örn. Gece plağı"></label>
+            <label>Teslim tarihi<input type="date" name="due"></label>
+            <label>Sorumlu teknisyen<input name="owner" maxlength="80" placeholder="Ad veya baş harfler"></label>
+            <label>Asistan<input name="assistant" maxlength="80" placeholder="Varsa asistanın adı" autocomplete="off"></label>
+            <label>Aşama<select name="status" id="form-status"></select></label>
           </div>
-          <div class="temporary-flow-actions">
-            <button type="button" class="secondary" id="temporary-next"></button>
-            <button type="button" class="secondary" id="temporary-revise" hidden>Düzeltme istendi</button>
+          <label class="checkbox"><input type="checkbox" name="temporary">Geçici protez gerekiyor</label>
+          <section class="temporary-flow" id="temporary-flow" aria-labelledby="temporary-flow-title" hidden>
+            <div class="temporary-flow-head">
+              <h3 id="temporary-flow-title">Geçici iş akışı</h3>
+              <span id="temporary-phase" class="badge" role="status"></span>
+            </div>
+            <div class="temporary-flow-actions">
+              <button type="button" class="secondary" id="temporary-next"></button>
+              <button type="button" class="secondary" id="temporary-revise" hidden>Düzeltme istendi</button>
+            </div>
+          </section>
+          <details class="job-extra" id="job-extra-details">
+            <summary>Diğer iş ayrıntıları</summary>
+            <div class="form-grid">
+              <label>Giriş tarihi<input type="date" name="received"></label>
+              <label>Prova tarihi<input type="date" name="trial"></label>
+              <label>Diş numarası / Bölge<input name="teeth" maxlength="80" placeholder="Örn. 11–13 veya üst çene"></label>
+              <label>Üye / Adet<input name="units" type="number" min="1" step="1" inputmode="numeric" placeholder="Örn. 3"></label>
+              <label>Renk<input name="shade" maxlength="30" placeholder="Örn. A2"></label>
+            </div>
+            <label class="notes">Hekim notları<textarea name="doctorNotes" rows="3" maxlength="1000" placeholder="Örn. Prova uygun."></textarea></label>
+            <label class="notes">Üretim notları<textarea name="notes" rows="3" maxlength="1000" placeholder="Örn. A2 disk, kazıma sonrası kontrol"></textarea></label>
+          </details>
+          <div class="record-meta" id="record-meta" hidden></div>
+        </div>
+        <section class="delete-confirmation" id="delete-confirmation" aria-labelledby="delete-confirm-title" aria-describedby="delete-confirm-message" hidden>
+          <h3 id="delete-confirm-title" tabindex="-1">Emin misin?</h3>
+          <p id="delete-confirm-message">Bu iş silindiğinde ekipteki herkesin listesinden kaldırılır.</p>
+          <p id="delete-countdown" role="timer" aria-live="off">4 saniye bekleyin.</p>
+          <span id="delete-status" class="sr-only" role="status"></span>
+          <div class="delete-actions">
+            <button type="button" class="secondary" id="delete-cancel">Silmeyi iptal et</button>
+            <button type="button" class="primary delete-confirm" id="delete-confirm" disabled>Sil</button>
           </div>
         </section>
-        <details class="job-extra" id="job-extra-details">
-          <summary>Diğer iş ayrıntıları</summary>
-          <div class="form-grid">
-            <label>Giriş tarihi<input type="date" name="received"></label>
-            <label>Prova tarihi<input type="date" name="trial"></label>
-            <label>Diş numarası / Bölge<input name="teeth" maxlength="80" placeholder="Örn. 11–13 veya üst çene"></label>
-            <label>Üye / Adet<input name="units" type="number" min="1" step="1" inputmode="numeric" placeholder="Örn. 3"></label>
-            <label>Renk<input name="shade" maxlength="30" placeholder="Örn. A2"></label>
-          </div>
-          <label class="notes">Hekim notları<textarea name="doctorNotes" rows="3" maxlength="1000" placeholder="Örn. Prova uygun."></textarea></label>
-          <label class="notes">Üretim notları<textarea name="notes" rows="3" maxlength="1000" placeholder="Örn. A2 disk, kazıma sonrası kontrol"></textarea></label>
-        </details>
-        <div class="record-meta" id="record-meta" hidden></div>
         <p class="form-error" id="form-error" role="alert" hidden></p>
       </div>
-      <div class="dialog-footer"><button type="button" class="secondary" data-close>Vazgeç</button><button type="submit" class="primary" id="save-job"><span data-icon="check"></span><span>İşi kaydet</span></button></div>
+      <div class="dialog-footer">
+        <button type="button" class="secondary delete-job" id="delete-job" aria-controls="delete-confirmation" aria-expanded="false" hidden>İşi sil</button>
+        <button type="button" class="secondary" data-close>Vazgeç</button>
+        <button type="submit" class="primary" id="save-job"><span data-icon="check"></span><span>İşi kaydet</span></button>
+      </div>
     </form>
   </dialog>
   <div class="toast" id="toast" role="status" hidden></div>
